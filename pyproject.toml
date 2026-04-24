@@ -1,7 +1,27 @@
 [project]
 name = "projet-7"
 version = "0.1.0"
-description = "Add your description here"
+description = "POC RAG pour des recommandations d'evenements culturels a partir d'OpenAgenda."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "python-dotenv",
+    "requests",
+    "pandas",
+    "langchain",
+    "langchain-community",
+    "faiss-cpu",
+    "mistralai",
+    "ragas",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "httpx",
+    "ruff",
+]

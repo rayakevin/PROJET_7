@@ -1,0 +1,10 @@
+[
+  {
+    "question": "Quels événements jazz sont prévus à Paris ?",
+    "reference_answer": "Un festival de jazz en plein air est prévu à Paris."
+  },
+  {
+    "question": "Y a-t-il une exposition photo à Paris ?",
+    "reference_answer": "Oui, une exposition photo contemporaine est prévue à Paris."
+  }
+]

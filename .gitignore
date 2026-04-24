@@ -1,10 +1,58 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+*.pyd
+*.so
+.python-version
+
+# Build artifacts
 build/
 dist/
-wheels/
-*.egg-info
+site/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
 # Virtual environments
-.venv
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local data artifacts
+data/raw/*
+data/interim/*
+data/processed/*
+data/vector_store/*
+data/evaluation/results/*
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/vector_store/.gitkeep
+!data/evaluation/.gitkeep
+!data/evaluation/results/.gitkeep
+
+# Logs
+*.log
+logs/

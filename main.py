@@ -1,6 +1,5 @@
-def main():
-    print("Hello from projet-7!")
+"""Point d'entrée racine du projet.
 
-
-if __name__ == "__main__":
-    main()
+Ce fichier servira à lancer rapidement l'API en local.
+Il pourra ensuite appeler Uvicorn et exposer l'application FastAPI définie dans app/main.py.
+"""
