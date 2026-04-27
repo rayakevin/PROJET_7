@@ -1,0 +1,19 @@
+# Fichier de dependances pour les environnements sans uv.
+# La source principale du projet reste pyproject.toml + uv.lock.
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+requests
+pandas
+langchain
+langchain-community
+faiss-cpu
+mistralai<2
+ragas
+
+# Developpement et tests
+pytest
+pytest-cov
+httpx
+ruff
