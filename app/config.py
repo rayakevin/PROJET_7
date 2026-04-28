@@ -64,6 +64,7 @@ class Settings:
     app_env: str = os.getenv("APP_ENV", "local")
     app_host: str = os.getenv("APP_HOST", "127.0.0.1")
     app_port: int = _int_env("APP_PORT", 8000)
+    api_rebuild_token: str = os.getenv("API_REBUILD_TOKEN", "")
 
     opendatasoft_records_url: str = os.getenv(
         "OPENDATASOFT_RECORDS_URL",

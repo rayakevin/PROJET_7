@@ -1,8 +1,23 @@
-"""Point d'entrée applicatif FastAPI.
+"""Point d'entree applicatif FastAPI."""
 
-Ce fichier servira à :
-- créer l'application FastAPI ;
-- charger la configuration globale ;
-- brancher les routes définies dans app/api/routes.py ;
-- préparer le démarrage de l'API.
-"""
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from app.api.routes import router
+from app.config import settings
+
+
+def create_app() -> FastAPI:
+    """Cree et configure l'application FastAPI."""
+
+    app = FastAPI(
+        title=settings.app_name,
+        description="API REST du POC RAG culturel Puls-Events.",
+        version="0.1.0",
+    )
+    app.include_router(router)
+    return app
+
+
+app = create_app()

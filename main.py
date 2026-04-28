@@ -1,5 +1,6 @@
-"""Point d'entrée racine du projet.
+"""Entree racine exposant l'application FastAPI."""
 
-Ce fichier servira à lancer rapidement l'API en local.
-Il pourra ensuite appeler Uvicorn et exposer l'application FastAPI définie dans app/main.py.
-"""
+from app.main import app
+
+
+__all__ = ["app"]

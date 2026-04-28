@@ -113,11 +113,57 @@ La reponse contient :
 - `answer` : reponse generee par Mistral ;
 - `sources` : chunks/evenements utilises avec titre, lieu, dates et score.
 
+## API REST
+
+Lancer l'API localement :
+
+```bash
+python scripts/run_api.py
+```
+
+Swagger est disponible a l'adresse :
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Endpoints principaux :
+
+- `GET /health` : etat de l'API et presence de l'index local ;
+- `POST /ask` : question utilisateur vers le chatbot RAG ;
+- `POST /rebuild` : reconstruction du dataset et de l'index FAISS.
+
+Exemple `/ask` :
+
+```bash
+curl -X POST http://127.0.0.1:8000/ask \
+  -H "Content-Type: application/json" \
+  -d "{\"question\":\"Quels concerts de jazz sont disponibles a Paris ?\"}"
+```
+
+Exemple `/rebuild` limite a 20 evenements pour un test rapide :
+
+```bash
+curl -X POST http://127.0.0.1:8000/rebuild \
+  -H "Content-Type: application/json" \
+  -d "{\"fetch\":false,\"max_events\":20}"
+```
+
+Si `API_REBUILD_TOKEN` est renseigne, `/rebuild` exige l'en-tete
+`X-Rebuild-Token`.
+
+Test fonctionnel manuel :
+
+```bash
+python scripts/api_test.py
+```
+
 ## Variables cles
 
 | Variable | Usage |
 |---|---|
 | `MISTRAL_API_KEY` | Embeddings et generation Mistral |
+| `API_REBUILD_TOKEN` | Token optionnel pour proteger `/rebuild` |
 | `MISTRAL_EMBEDDING_MODEL` | Modele d'embeddings, par defaut `mistral-embed` |
 | `MISTRAL_CHAT_MODEL` | Modele de generation, par defaut `mistral-small-latest` |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | Parametres de generation |
@@ -139,6 +185,5 @@ La reponse contient :
 
 ## Prochaine sequence
 
-1. Exposer `/ask`, `/rebuild` et `/health` via FastAPI.
-2. Automatiser l'evaluation avec le jeu de test annote.
-3. Preparer la demonstration Docker locale.
+1. Automatiser l'evaluation avec le jeu de test annote.
+2. Preparer la demonstration Docker locale.
