@@ -45,6 +45,15 @@ def _float_env(name: str, default: float) -> float:
     return float(value) if value is not None else default
 
 
+def _optional_float_env(name: str, default: float | None = None) -> float | None:
+    """Convertit une variable d'environnement optionnelle en nombre decimal."""
+
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return float(value)
+
+
 @dataclass(slots=True)
 class Settings:
     """Regroupe les paramètres globaux du projet.
@@ -105,7 +114,11 @@ class Settings:
     embedding_retry_sleep_seconds: float = _float_env(
         "EMBEDDING_RETRY_SLEEP_SECONDS", 10.0
     )
-    top_k: int = _int_env("TOP_K", 5)
+    top_k: int = _int_env("TOP_K", 3)
+    retrieval_max_score: float | None = _optional_float_env(
+        "RETRIEVAL_MAX_SCORE", 0.45
+    )
+    retrieval_candidate_multiplier: int = _int_env("RETRIEVAL_CANDIDATE_MULTIPLIER", 8)
     chunk_size: int = _int_env("CHUNK_SIZE", 800)
     chunk_overlap: int = _int_env("CHUNK_OVERLAP", 100)
 

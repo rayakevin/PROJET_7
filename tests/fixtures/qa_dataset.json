@@ -1,10 +1,22 @@
 [
   {
-    "question": "Quels événements jazz sont prévus à Paris ?",
-    "reference_answer": "Un festival de jazz en plein air est prévu à Paris."
+    "question": "Je cherche un concert de Gospel Jazz pour la Fete de la musique a Paris, que peux-tu me proposer ?",
+    "reference_answer": "Le Concert de Gospel Jazz est propose pour la Fete de la musique a Paris, au 132 avenue de Versailles, le 21 juin 2025. L'evenement met en avant du gospel et du jazz, avec un concert suivi d'un cocktail dinatoire."
   },
   {
-    "question": "Y a-t-il une exposition photo à Paris ?",
-    "reference_answer": "Oui, une exposition photo contemporaine est prévue à Paris."
+    "question": "Je veux faire une activite cosplay a la Cite des sciences et de l'Industrie, quels evenements existent ?",
+    "reference_answer": "A la Cite des sciences et de l'Industrie, plusieurs evenements cosplay existent : Cosplaymania - Confection de masques le 27 avril 2025, Cosplaymania - Concours et defile cosplay le 27 avril 2025, Arduino et cosplay le 25 novembre 2025, ainsi que Cosplaymania et Cosplaymania 3 le 8 mai 2026."
+  },
+  {
+    "question": "Je cherche un spectacle jeune public des 3 ans a Paris, as-tu une recommandation ?",
+    "reference_answer": "Le spectacle Englouti ! spectacle jeune public des 3 ans est une recommandation pertinente. Il se joue au Theatre Mandapa le 14 mai 2025 et propose un conte poetique avec marionnette et danse autour du theme de l'environnement."
+  },
+  {
+    "question": "Je voudrais voir une exposition autour de l'art japonais a Paris, que proposes-tu ?",
+    "reference_answer": "L'exposition L'ecologie des choses - Regards sur les artistes japonais et leurs environnements de 1970 a nos jours est proposee a la Maison de la culture du Japon a Paris le 17 mai 2025."
+  },
+  {
+    "question": "Y a-t-il une avant-premiere du film RED BIRD a Paris ?",
+    "reference_answer": "Oui, l'avant-premiere du film RED BIRD est prevue au Grand Rex a Paris le 6 janvier 2026 a 20h30, en presence de l'equipe du film."
   }
 ]

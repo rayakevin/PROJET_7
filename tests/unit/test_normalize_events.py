@@ -48,6 +48,9 @@ def test_normalize_event_builds_full_text() -> None:
     assert normalized_event["keywords"] == ["jazz", "concert"]
     assert "Festival jazz en plein air" in normalized_event["full_text"]
     assert "Paris" in normalized_event["full_text"]
+    assert normalized_event["full_text"].index("Mots-cles") < normalized_event[
+        "full_text"
+    ].index("Description")
 
 
 def test_normalize_event_supports_opendatasoft_shape() -> None:
