@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.ingestion.build_dataset import build_dataset  # noqa: E402
 from app.ingestion.fetch_events import fetch_events  # noqa: E402
+from app.services.rebuild_service import rebuild_vector_index  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,6 +61,23 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Chemin du rapport qualite. Defaut : data/processed/events_quality_report.json",
     )
+    parser.add_argument(
+        "--index",
+        action="store_true",
+        help="Reconstruit aussi l'index vectoriel FAISS avec Mistral.",
+    )
+    parser.add_argument(
+        "--vector-store-dir",
+        type=Path,
+        default=None,
+        help="Dossier de sortie de l'index FAISS. Defaut : data/vector_store.",
+    )
+    parser.add_argument(
+        "--max-events",
+        type=int,
+        default=None,
+        help="Limite optionnelle d'evenements a indexer pour un test rapide.",
+    )
     return parser.parse_args()
 
 
@@ -85,6 +103,16 @@ def main() -> int:
     )
 
     print(f"Dataset normalise ecrit : {output_path}")
+
+    if args.index:
+        result = rebuild_vector_index(
+            dataset_path=output_path,
+            vector_store_dir=args.vector_store_dir,
+            max_events=args.max_events,
+        )
+        print(f"Index vectoriel ecrit : {result.vector_store_dir}")
+        print(f"Chunks indexes : {result.chunks_count}")
+
     return 0
 
 

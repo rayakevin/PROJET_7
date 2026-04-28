@@ -64,12 +64,43 @@ Sorties par defaut :
 
 - `data/raw/events_raw.json`
 - `data/processed/events_processed.json`
+- `data/processed/events_quality_report.json`
+
+## Indexation RAG
+
+Le dataset normalise est decoupe en chunks a partir du champ `full_text`, puis
+les chunks sont vectorises avec Mistral et sauvegardes dans un index FAISS.
+
+Construire uniquement l'index a partir du dataset deja present :
+
+```bash
+python scripts/rebuild_index.py --index
+```
+
+Faire un test limite pour eviter de vectoriser tout le dataset :
+
+```bash
+python scripts/rebuild_index.py --index --max-events 20
+```
+
+Reconstruire toute la chaine ingestion + dataset + index :
+
+```bash
+python scripts/rebuild_index.py --fetch --index --city Paris
+```
+
+Sorties FAISS par defaut :
+
+- `data/vector_store/index.faiss`
+- `data/vector_store/chunks.json`
 
 ## Variables cles
 
 | Variable | Usage |
 |---|---|
 | `MISTRAL_API_KEY` | Embeddings et generation Mistral |
+| `MISTRAL_EMBEDDING_MODEL` | Modele d'embeddings, par defaut `mistral-embed` |
+| `EMBEDDING_BATCH_SIZE` | Taille des lots envoyes a Mistral |
 | `OPENDATASOFT_RECORDS_URL` | Endpoint OpenDataSoft source |
 | `EVENTS_LOCATION` | Ville cible |
 | `EVENTS_LOOKBACK_DAYS` | Historique recupere, en jours |
@@ -87,8 +118,7 @@ Sorties par defaut :
 
 ## Prochaine sequence
 
-1. Brancher le chunking sur `data/processed/events_processed.json`.
-2. Generer les embeddings Mistral.
-3. Construire et sauvegarder l'index FAISS.
-4. Exposer `/ask`, `/rebuild` et `/health` via FastAPI.
-5. Automatiser l'evaluation avec le jeu de test annote.
+1. Brancher le retrieval sur l'index FAISS sauvegarde.
+2. Construire la generation de reponse avec Mistral.
+3. Exposer `/ask`, `/rebuild` et `/health` via FastAPI.
+4. Automatiser l'evaluation avec le jeu de test annote.

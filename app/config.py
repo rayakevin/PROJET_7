@@ -38,6 +38,13 @@ def _int_env(name: str, default: int) -> int:
     return int(value) if value is not None else default
 
 
+def _float_env(name: str, default: float) -> float:
+    """Convertit une variable d'environnement en nombre decimal."""
+
+    value = os.getenv(name)
+    return float(value) if value is not None else default
+
+
 @dataclass(slots=True)
 class Settings:
     """Regroupe les paramètres globaux du projet.
@@ -83,6 +90,20 @@ class Settings:
     evaluation_data_dir: Path = Path(
         os.getenv("EVALUATION_DATA_DIR", BASE_DIR / "data" / "evaluation")
     )
+
+    mistral_api_key: str = os.getenv("MISTRAL_API_KEY", "")
+    mistral_embedding_model: str = os.getenv("MISTRAL_EMBEDDING_MODEL", "mistral-embed")
+    embedding_batch_size: int = _int_env("EMBEDDING_BATCH_SIZE", 64)
+    embedding_batch_delay_seconds: float = _float_env(
+        "EMBEDDING_BATCH_DELAY_SECONDS", 1.0
+    )
+    embedding_max_retries: int = _int_env("EMBEDDING_MAX_RETRIES", 5)
+    embedding_retry_sleep_seconds: float = _float_env(
+        "EMBEDDING_RETRY_SLEEP_SECONDS", 10.0
+    )
+    top_k: int = _int_env("TOP_K", 5)
+    chunk_size: int = _int_env("CHUNK_SIZE", 800)
+    chunk_overlap: int = _int_env("CHUNK_OVERLAP", 100)
 
 
 settings = Settings()

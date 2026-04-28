@@ -6,6 +6,7 @@ pydantic
 python-dotenv
 requests
 pandas
+numpy
 langchain
 langchain-community
 faiss-cpu
