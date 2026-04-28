@@ -16,9 +16,11 @@ class EventRetriever:
         self,
         vector_store: FaissVectorStore,
         top_k: int = settings.top_k,
+        max_score: float | None = settings.retrieval_max_score,
     ) -> None:
         self.vector_store = vector_store
         self.top_k = top_k
+        self.max_score = max_score
 
     @classmethod
     def from_local(
@@ -26,12 +28,13 @@ class EventRetriever:
         vector_store_dir: str | Path = settings.vector_store_dir,
         embedding_model: EmbeddingModel | None = None,
         top_k: int = settings.top_k,
+        max_score: float | None = settings.retrieval_max_score,
     ) -> "EventRetriever":
         """Recharge le retriever depuis l'index local."""
 
         model = embedding_model or MistralEmbeddingModel()
         vector_store = FaissVectorStore.load(vector_store_dir, model)
-        return cls(vector_store=vector_store, top_k=top_k)
+        return cls(vector_store=vector_store, top_k=top_k, max_score=max_score)
 
     def retrieve(self, question: str) -> list[SearchResult]:
         """Retourne les meilleurs chunks pour une question."""
@@ -40,4 +43,8 @@ class EventRetriever:
         if not cleaned_question:
             raise ValueError("La question ne peut pas etre vide.")
 
-        return self.vector_store.search(cleaned_question, top_k=self.top_k)
+        return self.vector_store.search(
+            cleaned_question,
+            top_k=self.top_k,
+            max_score=self.max_score,
+        )

@@ -158,6 +158,54 @@ Test fonctionnel manuel :
 python scripts/api_test.py
 ```
 
+## Evaluation
+
+Le jeu de test annote se trouve dans `tests/fixtures/qa_dataset.json`.
+Le script d'evaluation interroge le chatbot, stocke les reponses et calcule :
+
+- metriques locales : nombre de sources et score moyen de retrieval ;
+- metriques Ragas attendues par la grille : `faithfulness`, `answer_relevance`
+  et `context_precision` ;
+- metrique Ragas complementaire : similarite semantique des reponses.
+
+Lancer l'evaluation complete :
+
+```bash
+python scripts/evaluate_rag.py
+```
+
+Lancer uniquement les metriques locales :
+
+```bash
+python scripts/evaluate_rag.py --skip-ragas
+```
+
+Sorties par defaut :
+
+- `data/evaluation/results/rag_evaluation_<timestamp>.json`
+- `data/evaluation/results/rag_evaluation_latest.json`
+
+Le rapport expose les noms internes Ragas et un resume lisible dans
+`summary.required_ragas_metrics` :
+
+```json
+{
+  "faithfulness": 0.9417,
+  "answer_relevance": 0.8681,
+  "context_precision": 0.8667
+}
+```
+
+Dernier resultat observe sur 3 questions annotees :
+
+```text
+Faithfulness: 0.9417
+Answer relevance: 0.8681
+Context precision: 0.8667
+Ragas semantic_similarity: 0.9479
+Sources moyennes: 3.0
+```
+
 ## Variables cles
 
 | Variable | Usage |
@@ -175,7 +223,8 @@ python scripts/api_test.py
 | `EVENTS_PAGE_SIZE` | Taille de page OpenDataSoft |
 | `DATA_DIR` | Racine des donnees locales |
 | `VECTOR_STORE_DIR` | Index vectoriel |
-| `TOP_K` | Nombre de chunks retournes |
+| `TOP_K` | Nombre maximum de chunks retournes, par defaut `3` |
+| `RETRIEVAL_MAX_SCORE` | Distance FAISS maximale conservee, par defaut `0.45` |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | Decoupage documentaire |
 
 ## Stack prevue
@@ -185,5 +234,5 @@ python scripts/api_test.py
 
 ## Prochaine sequence
 
-1. Automatiser l'evaluation avec le jeu de test annote.
-2. Preparer la demonstration Docker locale.
+1. Preparer la demonstration Docker locale.
+2. Rediger le rapport technique et les slides de soutenance.

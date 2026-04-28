@@ -214,12 +214,12 @@ def build_full_text(event: NormalizedEvent) -> str:
 
     parts = [
         f"Titre : {event.title}",
-        f"Description : {event.description}",
-        f"Lieu : {event.location_name}",
+        f"Mots-cles : {', '.join(event.keywords)}",
         f"Ville : {event.city}",
+        f"Lieu : {event.location_name}",
         f"Debut : {event.start}",
         f"Fin : {event.end}",
-        f"Mots-clés : {', '.join(event.keywords)}",
+        f"Description : {event.description}",
     ]
 
     # Les segments vides sont retirés pour éviter de polluer les embeddings.
