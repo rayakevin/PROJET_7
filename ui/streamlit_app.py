@@ -69,12 +69,12 @@ def main() -> None:
             "Ollama local": "ollama",
             "Auto : Mistral puis Ollama": "auto",
         }[llm_provider_label]
-        default_llm_model = "qwen3:30b" if llm_provider == "ollama" else ""
+        default_llm_model = "qwen2.5:7b" if llm_provider == "ollama" else ""
         llm_model = st.text_input(
             "Modèle LLM optionnel",
             value=default_llm_model,
             help=(
-                "Exemples : mistral-small-latest côté Mistral, qwen3:30b côté Ollama. "
+                "Exemples : mistral-small-latest côté Mistral, qwen2.5:7b côté Ollama. "
                 "Laisser vide pour utiliser la configuration serveur."
             ),
         )

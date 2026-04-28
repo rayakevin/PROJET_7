@@ -108,6 +108,7 @@ def metadata() -> MetadataResponse:
         ollama_chat_model=settings.ollama_chat_model,
         ollama_embedding_model=settings.ollama_embedding_model,
         ollama_min_tokens=settings.ollama_min_tokens,
+        ollama_num_ctx=settings.ollama_num_ctx,
         top_k=settings.top_k,
         retrieval_max_score=settings.retrieval_max_score,
         chunk_size=settings.chunk_size,

@@ -57,15 +57,16 @@ sur la machine hôte :
 
 ```powershell
 ollama list
-ollama pull qwen3:30b
+ollama pull qwen2.5:7b
 ```
 
 Puis ajouter dans `.env` :
 
 ```text
 LLM_PROVIDER=auto
-OLLAMA_CHAT_MODEL=qwen3:30b
-OLLAMA_MIN_TOKENS=1200
+OLLAMA_CHAT_MODEL=qwen2.5:7b
+OLLAMA_MIN_TOKENS=600
+OLLAMA_NUM_CTX=8192
 ```
 
 Dans Docker Compose, `OLLAMA_BASE_URL` pointe vers
