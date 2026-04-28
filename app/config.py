@@ -106,13 +106,14 @@ class Settings:
     llm_temperature: float = _float_env("LLM_TEMPERATURE", 0.2)
     llm_max_tokens: int = _int_env("LLM_MAX_TOKENS", 600)
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-    ollama_chat_model: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3:30b")
+    ollama_chat_model: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen2.5:7b")
     ollama_embedding_model: str = os.getenv(
         "OLLAMA_EMBEDDING_MODEL",
         "nomic-embed-text",
     )
     ollama_timeout_seconds: int = _int_env("OLLAMA_TIMEOUT_SECONDS", 180)
-    ollama_min_tokens: int = _int_env("OLLAMA_MIN_TOKENS", 1200)
+    ollama_min_tokens: int = _int_env("OLLAMA_MIN_TOKENS", 600)
+    ollama_num_ctx: int = _int_env("OLLAMA_NUM_CTX", 8192)
     embedding_batch_size: int = _int_env("EMBEDDING_BATCH_SIZE", 64)
     embedding_batch_delay_seconds: float = _float_env(
         "EMBEDDING_BATCH_DELAY_SECONDS", 1.0

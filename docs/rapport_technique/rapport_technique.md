@@ -188,7 +188,7 @@ pour construire les vecteurs FAISS.
 
 - Embeddings par défaut : `mistral-embed`.
 - Génération par défaut : `mistral-small-latest`.
-- Génération locale optionnelle : Ollama, par exemple `qwen3:30b`.
+- Génération locale optionnelle : Ollama, par exemple `qwen2.5:7b`.
 
 ### Pourquoi ces modèles ?
 
@@ -202,9 +202,9 @@ Ces modèles répondent bien au cadre du POC :
 Ollama est ajouté comme fournisseur local pour limiter la dépendance à l'API
 Mistral pendant une démonstration. Le mode `LLM_PROVIDER=ollama` force la
 génération locale. Le mode `LLM_PROVIDER=auto` tente Mistral puis bascule vers
-Ollama si l'appel externe échoue. Pour les modèles reasoning comme `qwen3:30b`,
-`OLLAMA_MIN_TOKENS` impose un minimum de génération afin de laisser au modèle le
-temps de produire une réponse finale après son raisonnement interne.
+Ollama si l'appel externe échoue. Le modèle local par défaut est `qwen2.5:7b`
+car il est plus léger que `qwen3:30b`, tient beaucoup mieux en VRAM et répond
+plus directement pour une démonstration RAG.
 
 ### Prompting
 
@@ -302,7 +302,7 @@ Requête :
   "temperature": 0.2,
   "max_tokens": 600,
   "llm_provider": "auto",
-  "llm_model": "qwen3:30b"
+  "llm_model": "qwen2.5:7b"
 }
 ```
 

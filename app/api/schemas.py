@@ -33,6 +33,7 @@ class MetadataResponse(BaseModel):
     ollama_chat_model: str
     ollama_embedding_model: str
     ollama_min_tokens: int
+    ollama_num_ctx: int
     top_k: int
     retrieval_max_score: float | None
     chunk_size: int

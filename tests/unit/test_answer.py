@@ -87,13 +87,14 @@ def test_ollama_answer_generator_calls_local_chat_api(monkeypatch) -> None:
     monkeypatch.setattr("app.rag.answer.requests.post", fake_post)
     generator = OllamaAnswerGenerator(
         base_url="http://localhost:11434",
-        model="qwen3:30b",
+        model="qwen2.5:7b",
     )
 
     answer = generator.generate("Question ?", [], temperature=0.1, max_tokens=200)
 
     assert answer == "Réponse locale."
     assert captured_payload["url"] == "http://localhost:11434/api/chat"
-    assert captured_payload["json"]["model"] == "qwen3:30b"
+    assert captured_payload["json"]["model"] == "qwen2.5:7b"
     assert captured_payload["json"]["options"]["temperature"] == 0.1
     assert captured_payload["json"]["options"]["num_predict"] == settings.ollama_min_tokens
+    assert captured_payload["json"]["options"]["num_ctx"] == settings.ollama_num_ctx

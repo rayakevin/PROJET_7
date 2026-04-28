@@ -132,7 +132,7 @@ La génération après retrieval peut tourner sans API Mistral avec Ollama :
 
 ```bash
 ollama serve
-ollama pull qwen3:30b
+ollama pull qwen2.5:7b
 ```
 
 Puis utiliser l'un des modes suivants :
@@ -140,11 +140,11 @@ Puis utiliser l'un des modes suivants :
 ```bash
 # Génération locale uniquement, en gardant l'index Mistral existant.
 LLM_PROVIDER=ollama
-OLLAMA_CHAT_MODEL=qwen3:30b
+OLLAMA_CHAT_MODEL=qwen2.5:7b
 
 # Fallback : Mistral est tenté en premier, puis Ollama prend le relais.
 LLM_PROVIDER=auto
-OLLAMA_CHAT_MODEL=qwen3:30b
+OLLAMA_CHAT_MODEL=qwen2.5:7b
 ```
 
 Attention : avec l'index actuel construit en `mistral-embed`, le retrieval
@@ -468,9 +468,10 @@ doivent être ajoutées au `.env` que si l'on veut les surcharger localement.
 | `LLM_PROVIDER` | `mistral` | Génération : `mistral`, `ollama` ou `auto` |
 | `EMBEDDING_PROVIDER` | `mistral` | Embeddings : `mistral` ou `ollama` |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Serveur Ollama local |
-| `OLLAMA_CHAT_MODEL` | `qwen3:30b` | Modèle local de génération |
+| `OLLAMA_CHAT_MODEL` | `qwen2.5:7b` | Modèle local de génération |
 | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Modèle local d'embeddings |
-| `OLLAMA_MIN_TOKENS` | `1200` | Minimum de génération Ollama, utile pour les modèles reasoning |
+| `OLLAMA_MIN_TOKENS` | `600` | Minimum de génération Ollama |
+| `OLLAMA_NUM_CTX` | `8192` | Taille de contexte Ollama pour limiter la pression VRAM/RAM |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | `0.2` / `600` | Paramètres de génération par défaut |
 | `EMBEDDING_BATCH_SIZE` | `64` | Taille des lots envoyés à Mistral |
 | `OPENDATASOFT_RECORDS_URL` | endpoint public OpenDataSoft | Source de données |

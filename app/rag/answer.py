@@ -136,6 +136,7 @@ class OllamaAnswerGenerator:
                     settings.llm_max_tokens if max_tokens is None else max_tokens,
                     settings.ollama_min_tokens,
                 ),
+                "num_ctx": settings.ollama_num_ctx,
             },
         }
 
