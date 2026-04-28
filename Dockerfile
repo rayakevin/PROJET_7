@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY app ./app
 COPY scripts ./scripts
+COPY ui ./ui
 COPY data ./data
 COPY main.py README.md pyproject.toml ./
 

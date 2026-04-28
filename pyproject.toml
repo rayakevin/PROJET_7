@@ -17,6 +17,7 @@ dependencies = [
     "faiss-cpu",
     "mistralai<2",
     "ragas",
+    "streamlit",
 ]
 
 [dependency-groups]

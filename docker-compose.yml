@@ -18,3 +18,22 @@ services:
       EVALUATION_DATA_DIR: /app/data/evaluation
     ports:
       - "8000:8000"
+
+  streamlit-ui:
+    image: projet7-rag-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: http://rag-api:8000
+    command: >
+      streamlit run ui/streamlit_app.py
+      --server.address 0.0.0.0
+      --server.port 8501
+      --browser.gatherUsageStats false
+    ports:
+      - "8501:8501"
+    depends_on:
+      - rag-api

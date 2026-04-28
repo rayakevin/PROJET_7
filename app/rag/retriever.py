@@ -43,8 +43,28 @@ class EventRetriever:
         if not cleaned_question:
             raise ValueError("La question ne peut pas etre vide.")
 
-        return self.vector_store.search(
+        return self.search(
             cleaned_question,
             top_k=self.top_k,
             max_score=self.max_score,
+        )
+
+    def search(
+        self,
+        question: str,
+        top_k: int | None = None,
+        max_score: float | None = None,
+        candidate_multiplier: int | None = None,
+    ) -> list[SearchResult]:
+        """Recherche avec des parametres optionnels de retrieval."""
+
+        return self.vector_store.search(
+            question,
+            top_k=top_k or self.top_k,
+            max_score=self.max_score if max_score is None else max_score,
+            candidate_multiplier=(
+                settings.retrieval_candidate_multiplier
+                if candidate_multiplier is None
+                else candidate_multiplier
+            ),
         )

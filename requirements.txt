@@ -12,6 +12,7 @@ langchain-community
 faiss-cpu
 mistralai<2
 ragas
+streamlit
 
 # Developpement et tests
 pytest

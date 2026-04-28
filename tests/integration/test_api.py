@@ -4,14 +4,22 @@ from fastapi.testclient import TestClient
 
 from app.api import routes
 from app.main import app
-from app.services.qa_service import AnswerSource, QAResponse
+from app.services.qa_service import AnswerSource, QAParameters, QAResponse
 from app.services.rebuild_service import RebuildIndexResult
 
 
 class FakeQAService:
     """Service QA de test sans appel Mistral."""
 
-    def ask(self, question: str) -> QAResponse:
+    def __init__(self) -> None:
+        self.last_parameters: QAParameters | None = None
+
+    def ask(
+        self,
+        question: str,
+        parameters: QAParameters | None = None,
+    ) -> QAResponse:
+        self.last_parameters = parameters
         return QAResponse(
             question=question,
             answer="Voici une reponse de test.",
@@ -27,6 +35,7 @@ class FakeQAService:
                     score=0.42,
                 )
             ],
+            parameters=parameters or QAParameters(),
         )
 
 
@@ -56,6 +65,39 @@ def test_ask_endpoint_returns_rag_answer() -> None:
     payload = response.json()
     assert payload["answer"] == "Voici une reponse de test."
     assert payload["sources"][0]["title"] == "Concert jazz"
+    assert payload["parameters"]["top_k"] is None
+
+
+def test_ask_endpoint_accepts_runtime_parameters() -> None:
+    """Verifie que /ask accepte les hyperparametres exposes a l'UI."""
+
+    fake_service = FakeQAService()
+    app.dependency_overrides[routes.get_qa_service] = lambda: fake_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Quels concerts jazz ?",
+            "top_k": 4,
+            "retrieval_max_score": 0.5,
+            "retrieval_candidate_multiplier": 6,
+            "temperature": 0.4,
+            "max_tokens": 500,
+        },
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["parameters"]["top_k"] == 4
+    assert fake_service.last_parameters == QAParameters(
+        top_k=4,
+        retrieval_max_score=0.5,
+        retrieval_candidate_multiplier=6,
+        temperature=0.4,
+        max_tokens=500,
+    )
 
 
 def test_ask_endpoint_rejects_empty_question() -> None:

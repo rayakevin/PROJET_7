@@ -34,7 +34,13 @@ ANSWER_PROMPT = ChatPromptTemplate.from_messages(
 class AnswerGenerator(Protocol):
     """Interface minimale du generateur de reponse."""
 
-    def generate(self, question: str, contexts: list[SearchResult]) -> str:
+    def generate(
+        self,
+        question: str,
+        contexts: list[SearchResult],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """Genere une reponse finale."""
 
 
@@ -57,7 +63,13 @@ class MistralAnswerGenerator:
         self.max_tokens = max_tokens or settings.llm_max_tokens
         self.client = Mistral(api_key=self.api_key)
 
-    def generate(self, question: str, contexts: list[SearchResult]) -> str:
+    def generate(
+        self,
+        question: str,
+        contexts: list[SearchResult],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """Genere une reponse augmentee par le contexte retrieve."""
 
         messages = ANSWER_PROMPT.format_messages(
@@ -70,8 +82,8 @@ class MistralAnswerGenerator:
                 {"role": to_mistral_role(message.type), "content": str(message.content)}
                 for message in messages
             ],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
+            temperature=self.temperature if temperature is None else temperature,
+            max_tokens=self.max_tokens if max_tokens is None else max_tokens,
         )
         content = response.choices[0].message.content
         return str(content).strip()

@@ -18,6 +18,36 @@ class AskRequest(BaseModel):
     """Requete utilisateur pour le chatbot."""
 
     question: str = Field(..., min_length=1, examples=["Quels concerts jazz a Paris ?"])
+    top_k: int | None = Field(
+        default=None,
+        ge=1,
+        le=10,
+        description="Nombre maximum de sources retournees.",
+    )
+    retrieval_max_score: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Distance FAISS maximale conservee. Plus bas = plus strict.",
+    )
+    retrieval_candidate_multiplier: int | None = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Nombre de candidats FAISS avant reranking.",
+    )
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.5,
+        description="Temperature du LLM Mistral.",
+    )
+    max_tokens: int | None = Field(
+        default=None,
+        ge=100,
+        le=2000,
+        description="Nombre maximum de tokens generes.",
+    )
 
     @field_validator("question")
     @classmethod
@@ -49,6 +79,7 @@ class AskResponse(BaseModel):
     question: str
     answer: str
     sources: list[AnswerSourceResponse]
+    parameters: dict[str, int | float | None]
 
 
 class RebuildRequest(BaseModel):
