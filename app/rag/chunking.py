@@ -1,4 +1,4 @@
-"""Decoupage des evenements normalises en chunks indexables."""
+"""Découpage des événements normalisés en chunks indexables."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from app.config import settings
 
 @dataclass(frozen=True, slots=True)
 class TextChunk:
-    """Segment de texte avec metadonnees conservees pour le retrieval."""
+    """Segment de texte avec métadonnées conservées pour le retrieval."""
 
     id: str
     text: str
@@ -23,14 +23,14 @@ class TextChunk:
 
 
 def validate_chunk_parameters(chunk_size: int, chunk_overlap: int) -> None:
-    """Valide les parametres de decoupage."""
+    """Valide les paramètres de découpage."""
 
     if chunk_size <= 0:
-        raise ValueError("chunk_size doit etre strictement positif.")
+        raise ValueError("chunk_size doit être strictement positif.")
     if chunk_overlap < 0:
-        raise ValueError("chunk_overlap doit etre positif ou nul.")
+        raise ValueError("chunk_overlap doit être positif ou nul.")
     if chunk_overlap >= chunk_size:
-        raise ValueError("chunk_overlap doit etre inferieur a chunk_size.")
+        raise ValueError("chunk_overlap doit être inférieur à chunk_size.")
 
 
 def split_text(
@@ -38,7 +38,7 @@ def split_text(
     chunk_size: int = settings.chunk_size,
     chunk_overlap: int = settings.chunk_overlap,
 ) -> list[str]:
-    """Decoupe un texte en segments avec chevauchement."""
+    """Découpe un texte en segments avec chevauchement."""
 
     validate_chunk_parameters(chunk_size, chunk_overlap)
     cleaned_text = " ".join(str(text or "").split())
@@ -76,7 +76,7 @@ def chunk_event(
     chunk_size: int = settings.chunk_size,
     chunk_overlap: int = settings.chunk_overlap,
 ) -> list[TextChunk]:
-    """Transforme un evenement normalise en chunks avec metadonnees."""
+    """Transforme un événement normalisé en chunks avec métadonnées."""
 
     event_uid = str(event.get("uid") or "")
     text_parts = split_text(
@@ -112,7 +112,7 @@ def chunk_events(
     chunk_size: int = settings.chunk_size,
     chunk_overlap: int = settings.chunk_overlap,
 ) -> list[TextChunk]:
-    """Decoupe une liste d'evenements normalises."""
+    """Découpe une liste d'événements normalisés."""
 
     chunks: list[TextChunk] = []
     for event in events:

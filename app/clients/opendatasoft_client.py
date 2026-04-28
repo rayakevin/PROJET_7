@@ -13,7 +13,7 @@ from app.config import settings
 
 @dataclass(slots=True)
 class EventsQuery:
-    """Filtres utilises pour lire le dataset public d'evenements."""
+    """Filtres utilisés pour lire le dataset public d'événements."""
 
     city: str | None = None
     search: str | None = None
@@ -24,13 +24,15 @@ class EventsQuery:
 
 
 class OpenDataSoftEventsClient:
-    """Lit les evenements publics OpenAgenda via le portail OpenDataSoft."""
+    """Lit les événements publics OpenAgenda via le portail OpenDataSoft."""
 
     def __init__(
         self,
         records_url: str | None = None,
         timeout_seconds: int | None = None,
     ) -> None:
+        """Initialise le client HTTP avec l'URL et le timeout configurés."""
+
         self.records_url = records_url or settings.opendatasoft_records_url
         self.timeout_seconds = timeout_seconds or settings.request_timeout_seconds
         self.session = requests.Session()
@@ -41,7 +43,7 @@ class OpenDataSoftEventsClient:
         search: str | None = None,
         keywords: list[str] | None = None,
     ) -> EventsQuery:
-        """Construit une requete compatible avec le protocole d'ingestion."""
+        """Construit une requête compatible avec le protocole d'ingestion."""
 
         now = datetime.now(UTC)
         date_gte = (now - timedelta(days=settings.events_lookback_days)).date()
@@ -57,13 +59,15 @@ class OpenDataSoftEventsClient:
         )
 
     def list_events(self, query: EventsQuery) -> list[dict[str, Any]]:
-        """Retourne tous les evenements correspondant aux filtres principaux."""
+        """Retourne tous les événements correspondant aux filtres principaux."""
 
         offset = 0
         limit = min(query.size, 100)
         events: list[dict[str, Any]] = []
 
         while True:
+            # OpenDataSoft renvoie les résultats par page : on avance avec
+            # `offset` jusqu'à avoir lu toutes les pages disponibles.
             payload = self._request_records(query=query, limit=limit, offset=offset)
             records = payload.get("results", [])
             events.extend(self._filter_keywords(records, query.keywords))
@@ -80,6 +84,8 @@ class OpenDataSoftEventsClient:
         limit: int,
         offset: int,
     ) -> dict[str, Any]:
+        """Exécute un appel paginé vers l'endpoint OpenDataSoft."""
+
         params: dict[str, str | int] = {
             "limit": limit,
             "offset": offset,
@@ -100,6 +106,8 @@ class OpenDataSoftEventsClient:
 
     @staticmethod
     def _build_where(query: EventsQuery) -> str:
+        """Construit la clause `where` utilisée par l'API OpenDataSoft."""
+
         clauses = ["location_city is not null", "firstdate_begin is not null"]
 
         if query.city:
@@ -116,6 +124,8 @@ class OpenDataSoftEventsClient:
         records: list[dict[str, Any]],
         keywords: list[str] | None,
     ) -> list[dict[str, Any]]:
+        """Filtre localement les événements qui contiennent tous les mots-clés."""
+
         if not keywords:
             return records
 

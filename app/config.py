@@ -1,7 +1,7 @@
 """Configuration centrale du projet.
 
-Ce module centralise le chargement des variables d'environnement
-et la définition des paramètres globaux utilisés dans l'application.
+Ce module centralise le chargement des variables d'environnement et la
+définition des paramètres globaux utilisés dans l'application.
 """
 
 from __future__ import annotations
@@ -39,14 +39,14 @@ def _int_env(name: str, default: int) -> int:
 
 
 def _float_env(name: str, default: float) -> float:
-    """Convertit une variable d'environnement en nombre decimal."""
+    """Convertit une variable d'environnement en nombre décimal."""
 
     value = os.getenv(name)
     return float(value) if value is not None else default
 
 
 def _optional_float_env(name: str, default: float | None = None) -> float | None:
-    """Convertit une variable d'environnement optionnelle en nombre decimal."""
+    """Convertit une variable d'environnement optionnelle en nombre décimal."""
 
     value = os.getenv(name)
     if value is None or value.strip() == "":
@@ -88,9 +88,6 @@ class Settings:
 
     data_dir: Path = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
     raw_data_dir: Path = Path(os.getenv("RAW_DATA_DIR", BASE_DIR / "data" / "raw"))
-    interim_data_dir: Path = Path(
-        os.getenv("INTERIM_DATA_DIR", BASE_DIR / "data" / "interim")
-    )
     processed_data_dir: Path = Path(
         os.getenv("PROCESSED_DATA_DIR", BASE_DIR / "data" / "processed")
     )
@@ -104,8 +101,18 @@ class Settings:
     mistral_api_key: str = os.getenv("MISTRAL_API_KEY", "")
     mistral_embedding_model: str = os.getenv("MISTRAL_EMBEDDING_MODEL", "mistral-embed")
     mistral_chat_model: str = os.getenv("MISTRAL_CHAT_MODEL", "mistral-small-latest")
+    llm_provider: str = os.getenv("LLM_PROVIDER", "mistral")
+    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "mistral")
     llm_temperature: float = _float_env("LLM_TEMPERATURE", 0.2)
     llm_max_tokens: int = _int_env("LLM_MAX_TOKENS", 600)
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    ollama_chat_model: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen3:30b")
+    ollama_embedding_model: str = os.getenv(
+        "OLLAMA_EMBEDDING_MODEL",
+        "nomic-embed-text",
+    )
+    ollama_timeout_seconds: int = _int_env("OLLAMA_TIMEOUT_SECONDS", 180)
+    ollama_min_tokens: int = _int_env("OLLAMA_MIN_TOKENS", 1200)
     embedding_batch_size: int = _int_env("EMBEDDING_BATCH_SIZE", 64)
     embedding_batch_delay_seconds: float = _float_env(
         "EMBEDDING_BATCH_DELAY_SECONDS", 1.0
@@ -118,7 +125,6 @@ class Settings:
     retrieval_max_score: float | None = _optional_float_env(
         "RETRIEVAL_MAX_SCORE", 0.45
     )
-    retrieval_candidate_multiplier: int = _int_env("RETRIEVAL_CANDIDATE_MULTIPLIER", 8)
     chunk_size: int = _int_env("CHUNK_SIZE", 800)
     chunk_overlap: int = _int_env("CHUNK_OVERLAP", 100)
 

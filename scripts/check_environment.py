@@ -74,7 +74,7 @@ def get_package_version(package_name: str | None) -> str:
     Parameters
     ----------
     package_name:
-        Nom du paquet tel qu'il apparait dans l'environnement Python.
+        Nom du paquet tel qu'il apparaît dans l'environnement Python.
 
     Returns
     -------
@@ -92,7 +92,7 @@ def get_package_version(package_name: str | None) -> str:
 
 
 def run_import_check(check: ImportCheck) -> bool:
-    """Execute une vérification d'import et affiche un resultat lisible.
+    """Exécute une vérification d'import et affiche un résultat lisible.
 
     Parameters
     ----------
@@ -108,7 +108,7 @@ def run_import_check(check: ImportCheck) -> bool:
     try:
         module = import_module(check.module_path)
 
-        # Certains controles visent une classe precise dans le module.
+        # Certains contrôles visent une classe précise dans le module.
         if check.attribute is not None:
             getattr(module, check.attribute)
 

@@ -1,4 +1,4 @@
-"""Routes FastAPI exposant le systeme RAG."""
+"""Routes FastAPI exposant le système RAG."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from app.api.schemas import (
     AskResponse,
     ErrorResponse,
     HealthResponse,
+    MetadataResponse,
     RebuildRequest,
     RebuildResponse,
 )
@@ -26,23 +27,37 @@ _qa_service_cache: QAService | None = None
 
 
 def get_qa_service() -> QAService:
-    """Retourne un service QA reutilise entre les appels."""
+    """Retourne un service QA réutilisé entre les appels."""
 
     global _qa_service_cache
     if _qa_service_cache is None:
-        _qa_service_cache = QAService()
+        try:
+            _qa_service_cache = QAService()
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Index vectoriel absent. Lancez /rebuild ou "
+                    "scripts/rebuild_index.py --index."
+                ),
+            ) from exc
+        except (RuntimeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
     return _qa_service_cache
 
 
 def reset_qa_service_cache() -> None:
-    """Force le rechargement du service QA apres rebuild."""
+    """Force le rechargement du service QA après rebuild."""
 
     global _qa_service_cache
     _qa_service_cache = None
 
 
 def vector_store_ready() -> bool:
-    """Indique si les artefacts d'index sont presents localement."""
+    """Indique si les artefacts d'index sont présents localement."""
 
     vector_store_dir = Path(settings.vector_store_dir)
     return all(
@@ -54,15 +69,49 @@ def vector_store_ready() -> bool:
 @router.get(
     "/health",
     response_model=HealthResponse,
-    summary="Verifier la disponibilite de l'API",
+    summary="Vérifier la disponibilité de l'API",
 )
 def health() -> HealthResponse:
-    """Retourne l'etat minimal de l'API et de l'index local."""
+    """Retourne l'état minimal de l'API et de l'index local."""
 
     return HealthResponse(
         status="ok",
         app_name=settings.app_name,
         environment=settings.app_env,
+        vector_store_ready=vector_store_ready(),
+    )
+
+
+@router.get(
+    "/metadata",
+    response_model=MetadataResponse,
+    summary="Consulter la configuration publique du POC",
+)
+def metadata() -> MetadataResponse:
+    """Expose les informations utiles aux équipes métier et produit.
+
+    La clé API Mistral et le token de rebuild ne sont jamais retournés.
+    """
+
+    return MetadataResponse(
+        app_name=settings.app_name,
+        environment=settings.app_env,
+        source_dataset_url=settings.opendatasoft_records_url,
+        events_location=settings.events_location,
+        events_lookback_days=settings.events_lookback_days,
+        events_lookahead_days=settings.events_lookahead_days,
+        embedding_model=settings.mistral_embedding_model,
+        embedding_provider=settings.embedding_provider,
+        chat_model=settings.mistral_chat_model,
+        llm_provider=settings.llm_provider,
+        ollama_base_url=settings.ollama_base_url,
+        ollama_chat_model=settings.ollama_chat_model,
+        ollama_embedding_model=settings.ollama_embedding_model,
+        ollama_min_tokens=settings.ollama_min_tokens,
+        top_k=settings.top_k,
+        retrieval_max_score=settings.retrieval_max_score,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
         vector_store_ready=vector_store_ready(),
     )
 
@@ -77,7 +126,7 @@ def ask(
     request: AskRequest,
     service: QAService = Depends(get_qa_service),
 ) -> AskResponse:
-    """Genere une reponse augmentee a partir de l'index FAISS."""
+    """Génère une réponse augmentée à partir de l'index FAISS."""
 
     try:
         response = service.ask(
@@ -85,9 +134,10 @@ def ask(
             parameters=QAParameters(
                 top_k=request.top_k,
                 retrieval_max_score=request.retrieval_max_score,
-                retrieval_candidate_multiplier=request.retrieval_candidate_multiplier,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
+                llm_provider=request.llm_provider,
+                llm_model=request.llm_model,
             ),
         )
     except ValueError as exc:
@@ -119,10 +169,10 @@ def rebuild(
     request: RebuildRequest,
     x_rebuild_token: str | None = Header(default=None),
 ) -> RebuildResponse:
-    """Reconstruit l'index vectoriel a la demande.
+    """Reconstruit l'index vectoriel à la demande.
 
-    Si `API_REBUILD_TOKEN` est defini, l'appel doit fournir le meme token dans
-    l'en-tete `X-Rebuild-Token`.
+    Si `API_REBUILD_TOKEN` est défini, l'appel doit fournir le même token dans
+    l'en-tête `X-Rebuild-Token`.
     """
 
     if settings.api_rebuild_token and x_rebuild_token != settings.api_rebuild_token:

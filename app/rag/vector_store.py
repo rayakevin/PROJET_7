@@ -21,6 +21,17 @@ from app.utils.io import read_json, write_json
 INDEX_NAME = "index"
 CHUNKS_FILENAME = "chunks.json"
 DEFAULT_LEXICAL_CANDIDATE_LIMIT = 30
+
+# Les poids ci-dessous rendent le reranking explicite :
+# un mot trouvé dans le titre est plus important qu'un mot trouvé seulement
+# dans le texte complet, car le titre résume souvent le thème de l'événement.
+TITLE_TOKEN_WEIGHT = 4.0
+KEYWORD_TOKEN_WEIGHT = 3.0
+LOCATION_TOKEN_WEIGHT = 1.5
+TEXT_TOKEN_WEIGHT = 1.0
+FOCUS_MISMATCH_PENALTY = 6.0
+IDF_POWER = 1.5
+
 STOPWORDS = {
     "a",
     "au",
@@ -56,16 +67,22 @@ STOPWORDS = {
 
 @dataclass(frozen=True, slots=True)
 class SearchResult:
-    """Resultat de recherche vectorielle."""
+    """Résultat de recherche.
+
+    Le champ `score` correspond à la distance FAISS retournée par LangChain :
+    plus elle est basse, plus le chunk est proche de la question.
+    """
 
     chunk: TextChunk
     score: float
 
 
 class LangChainEmbeddingAdapter(Embeddings):
-    """Adaptateur entre notre modele d'embeddings et LangChain."""
+    """Adaptateur entre notre modèle d'embeddings et LangChain."""
 
     def __init__(self, embedding_model: EmbeddingModel) -> None:
+        """Stocke le modèle d'embeddings utilisé par LangChain."""
+
         self.embedding_model = embedding_model
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
@@ -74,15 +91,17 @@ class LangChainEmbeddingAdapter(Embeddings):
         return self.embedding_model.embed_documents(texts)
 
     def embed_query(self, text: str) -> list[float]:
-        """Vectorise une requete utilisateur."""
+        """Vectorise une requête utilisateur."""
 
         return self.embedding_model.embed_query(text)
 
 
 class FaissVectorStore:
-    """Index FAISS LangChain et metadonnees associees aux chunks."""
+    """Index FAISS LangChain et métadonnées associées aux chunks."""
 
     def __init__(self, store: FAISS, chunks: list[TextChunk]) -> None:
+        """Associe l'index FAISS aux chunks sauvegardés localement."""
+
         self.store = store
         self.chunks = chunks
 
@@ -92,7 +111,7 @@ class FaissVectorStore:
         chunks: list[TextChunk],
         embedding_model: EmbeddingModel,
     ) -> "FaissVectorStore":
-        """Construit un index FAISS LangChain a partir de chunks."""
+        """Construit un index FAISS LangChain à partir de chunks."""
 
         if not chunks:
             raise ValueError("Impossible de construire un index sans chunks.")
@@ -121,7 +140,7 @@ class FaissVectorStore:
         directory: str | Path = settings.vector_store_dir,
         embedding_model: EmbeddingModel | None = None,
     ) -> "FaissVectorStore":
-        """Recharge un index FAISS LangChain sauvegarde."""
+        """Recharge un index FAISS LangChain sauvegardé."""
 
         if embedding_model is None:
             from app.rag.embeddings import MistralEmbeddingModel
@@ -129,6 +148,9 @@ class FaissVectorStore:
             embedding_model = MistralEmbeddingModel()
 
         source_dir = Path(directory)
+        # LangChain sauvegarde une partie du vector store en pickle.
+        # Ici le fichier vient du dossier local du projet, reconstruit par nos
+        # scripts ; on autorise donc explicitement cette désérialisation.
         store = FAISS.load_local(
             str(source_dir),
             embeddings=LangChainEmbeddingAdapter(embedding_model),
@@ -151,17 +173,19 @@ class FaissVectorStore:
         query: str,
         top_k: int = settings.top_k,
         max_score: float | None = settings.retrieval_max_score,
-        candidate_multiplier: int = settings.retrieval_candidate_multiplier,
     ) -> list[SearchResult]:
-        """Recherche les chunks les plus similaires a une requete."""
+        """Recherche les chunks les plus proches d'une requête.
+
+        `max_score` est un seuil de distance FAISS, pas une similarité.
+        Une valeur plus basse est donc plus stricte.
+        """
 
         if top_k <= 0:
             return []
 
-        candidate_k = max(top_k, top_k * max(candidate_multiplier, 1))
         documents_with_scores = self.store.similarity_search_with_score(
             query,
-            k=candidate_k,
+            k=top_k,
         )
 
         results: list[SearchResult] = []
@@ -182,6 +206,9 @@ class FaissVectorStore:
         query_tokens = tokenize(query)
         token_weights = compute_query_token_weights(query_tokens, self.chunks)
 
+        # La recherche vectorielle retrouve les textes sémantiquement proches.
+        # La recherche lexicale rattrape les cas où un titre, un lieu ou un mot-clé
+        # exact est important pour la question.
         results = merge_candidates(
             vector_results=results,
             lexical_results=self.lexical_search(query_tokens, token_weights),
@@ -201,7 +228,7 @@ class FaissVectorStore:
         token_weights: dict[str, float],
         limit: int = DEFAULT_LEXICAL_CANDIDATE_LIMIT,
     ) -> list[SearchResult]:
-        """Ajoute des candidats par correspondance titre, mots-cles et texte."""
+        """Ajoute des candidats par correspondance titre, mots-clés et texte."""
 
         if not query_tokens:
             return []
@@ -224,6 +251,9 @@ class FaissVectorStore:
             reverse=True,
         )[:limit]
 
+        # Les candidats lexicaux n'ont pas de vraie distance FAISS, car ils ne
+        # viennent pas directement de `similarity_search_with_score`. On leur
+        # donne une distance de repli compatible avec le filtre final.
         fallback_score = (
             settings.retrieval_max_score
             if settings.retrieval_max_score is not None
@@ -253,7 +283,7 @@ def rerank_results(
     token_weights: dict[str, float],
     results: list[SearchResult],
 ) -> list[SearchResult]:
-    """Trie les resultats avec un score hybride vectoriel + lexical."""
+    """Trie les résultats avec un score hybride vectoriel + lexical."""
 
     return sorted(
         results,
@@ -263,7 +293,7 @@ def rerank_results(
 
 
 def deduplicate_by_event(results: list[SearchResult]) -> list[SearchResult]:
-    """Garde le meilleur chunk par evenement pour diversifier le contexte."""
+    """Garde le meilleur chunk par événement pour diversifier le contexte."""
 
     deduplicated: list[SearchResult] = []
     seen_events: set[str] = set()
@@ -281,7 +311,11 @@ def hybrid_rank_score(
     token_weights: dict[str, float],
     result: SearchResult,
 ) -> float:
-    """Score de tri combinant proximite FAISS et correspondance lexicale."""
+    """Score de tri combinant proximité FAISS et correspondance lexicale.
+
+    Ce score ne remplace pas la distance FAISS exposée dans l'API. Il sert
+    uniquement à ordonner les candidats avant de renvoyer les sources.
+    """
 
     lexical_score = lexical_relevance_score(
         query_tokens,
@@ -290,7 +324,11 @@ def hybrid_rank_score(
         result.chunk.metadata,
     )
     vector_score = 1 / (1 + max(result.score, 0.0))
-    focus_penalty = 0.0 if matches_query_focus(query_tokens, result.chunk) else 6.0
+    focus_penalty = (
+        0.0
+        if matches_query_focus(query_tokens, result.chunk)
+        else FOCUS_MISMATCH_PENALTY
+    )
     return vector_score + lexical_score - focus_penalty
 
 
@@ -300,7 +338,7 @@ def lexical_relevance_score(
     text: str,
     metadata: dict[str, Any],
 ) -> float:
-    """Mesure la couverture lexicale ponderee d'un candidat."""
+    """Mesure la couverture lexicale pondérée d'un candidat."""
 
     if not query_tokens:
         return 0.0
@@ -314,13 +352,13 @@ def lexical_relevance_score(
     for token in query_tokens:
         token_weight = token_weights.get(token, 1.0)
         if token in title_tokens:
-            score += 4.0 * token_weight
+            score += TITLE_TOKEN_WEIGHT * token_weight
         if token in keyword_tokens:
-            score += 3.0 * token_weight
+            score += KEYWORD_TOKEN_WEIGHT * token_weight
         if token in location_tokens:
-            score += 1.5 * token_weight
+            score += LOCATION_TOKEN_WEIGHT * token_weight
         if token in text_tokens:
-            score += 1.0 * token_weight
+            score += TEXT_TOKEN_WEIGHT * token_weight
 
     total_weight = sum(token_weights.get(token, 1.0) for token in query_tokens)
     return score / total_weight if total_weight else 0.0
@@ -330,7 +368,11 @@ def compute_query_token_weights(
     query_tokens: list[str],
     chunks: list[TextChunk],
 ) -> dict[str, float]:
-    """Pondere les tokens de requete selon leur rarete dans le corpus."""
+    """Pondère les tokens de requête selon leur rareté dans le corpus.
+
+    C'est une forme simple d'IDF : un mot rare dans les chunks compte plus
+    qu'un mot très fréquent.
+    """
 
     if not query_tokens or not chunks:
         return {token: 1.0 for token in query_tokens}
@@ -347,7 +389,7 @@ def compute_query_token_weights(
         token: (
             math.log((corpus_size + 1) / (token_document_frequency[token] + 1)) + 1
         )
-        ** 1.5
+        ** IDF_POWER
         for token in query_tokens
     }
 
@@ -367,7 +409,12 @@ def candidate_text(text: str, metadata: dict[str, Any]) -> str:
 
 
 def matches_query_focus(query_tokens: list[str], chunk: TextChunk) -> bool:
-    """Verifie que le candidat respecte les themes explicites de la question."""
+    """Vérifie que le candidat respecte les thèmes explicites de la question.
+
+    Cette petite couche métier évite par exemple qu'une question sur le jazz
+    récupère un événement culturel générique seulement parce que la description
+    contient des mots proches.
+    """
 
     candidate_text_value = candidate_text(chunk.text, chunk.metadata)
     candidate_tokens = set(tokenize(candidate_text_value))

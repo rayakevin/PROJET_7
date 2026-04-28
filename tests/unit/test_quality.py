@@ -1,16 +1,16 @@
-"""Tests unitaires du controle qualite."""
+"""Tests unitaires du contrôle qualité."""
 
 from app.ingestion.quality import assess_events_quality
 
 
 def test_assess_events_quality_reports_full_text_quality() -> None:
-    """Verifie les indicateurs principaux du rapport qualite."""
+    """Vérifie les indicateurs principaux du rapport qualité."""
 
     events = [
         {
             "uid": "evt-001",
             "title": "Concert jazz",
-            "description": "Un concert de jazz en plein air a Paris.",
+            "description": "Un concert de jazz en plein air à Paris.",
             "location_name": "Parc central",
             "city": "Paris",
             "start": "2026-05-02T19:30:00Z",

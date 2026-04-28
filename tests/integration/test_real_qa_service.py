@@ -9,18 +9,18 @@ from app.services.qa_service import QAService
 
 
 def test_real_qa_service_answers_with_sources() -> None:
-    """Verifie une reponse RAG complete sur l'index local."""
+    """Vérifie une réponse RAG complète sur l'index local."""
 
     index_path = Path(settings.vector_store_dir) / "index.faiss"
     chunks_path = Path(settings.vector_store_dir) / "chunks.json"
     pkl_path = Path(settings.vector_store_dir) / "index.pkl"
 
     if not settings.mistral_api_key:
-        pytest.skip("MISTRAL_API_KEY non renseignee.")
+        pytest.skip("MISTRAL_API_KEY non renseignée.")
     if not index_path.exists() or not chunks_path.exists() or not pkl_path.exists():
-        pytest.skip("Index FAISS reel absent. Lancer scripts/rebuild_index.py --index.")
+        pytest.skip("Index FAISS réel absent. Lancer scripts/rebuild_index.py --index.")
 
-    response = QAService().ask("Quels concerts de jazz sont disponibles a Paris ?")
+    response = QAService().ask("Quels concerts de jazz sont disponibles à Paris ?")
 
     assert response.answer
     assert response.sources

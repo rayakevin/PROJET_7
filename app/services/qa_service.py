@@ -1,31 +1,38 @@
-"""Service de question-reponse RAG."""
+"""Service de question-réponse RAG."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from langchain_core.runnables import RunnableLambda
-
-from app.rag.answer import AnswerGenerator, MistralAnswerGenerator
+from app.rag.answer import AnswerGenerator, build_answer_generator
 from app.rag.retriever import EventRetriever
 from app.rag.vector_store import SearchResult
 
 
 @dataclass(frozen=True, slots=True)
 class QAParameters:
-    """Parametres configurables pour une question RAG."""
+    """Paramètres configurables pour une question RAG.
+
+    Chaque champ est optionnel : quand une valeur vaut `None`, le service garde
+    le paramètre par défaut défini dans `app.config.settings`.
+    """
 
     top_k: int | None = None
     retrieval_max_score: float | None = None
-    retrieval_candidate_multiplier: int | None = None
     temperature: float | None = None
     max_tokens: int | None = None
+    llm_provider: str | None = None
+    llm_model: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class AnswerSource:
-    """Source utilisee pour generer une reponse."""
+    """Source utilisée pour générer une réponse.
+
+    `score` est une distance FAISS : plus elle est basse, plus la source est
+    proche de la question.
+    """
 
     chunk_id: str
     event_uid: str
@@ -39,7 +46,7 @@ class AnswerSource:
 
 @dataclass(frozen=True, slots=True)
 class QAResponse:
-    """Reponse complete du chatbot."""
+    """Réponse complète du chatbot."""
 
     question: str
     answer: str
@@ -47,7 +54,7 @@ class QAResponse:
     parameters: QAParameters = field(default_factory=QAParameters)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convertit la reponse en dictionnaire serialisable."""
+        """Convertit la réponse en dictionnaire sérialisable."""
 
         return {
             "question": self.question,
@@ -58,18 +65,17 @@ class QAResponse:
 
 
 class QAService:
-    """Orchestration LangChain du retrieval et de la generation."""
+    """Orchestration explicite du retrieval et de la génération."""
 
     def __init__(
         self,
         retriever: EventRetriever | None = None,
         answer_generator: AnswerGenerator | None = None,
     ) -> None:
+        """Charge les dépendances RAG, ou utilise celles injectées par les tests."""
+
         self.retriever = retriever or EventRetriever.from_local()
-        self.answer_generator = answer_generator or MistralAnswerGenerator()
-        self.chain = RunnableLambda(self._retrieve_step) | RunnableLambda(
-            self._generation_step
-        )
+        self.answer_generator = answer_generator
 
     def ask(
         self,
@@ -80,51 +86,35 @@ class QAService:
 
         cleaned_question = question.strip()
         if not cleaned_question:
-            raise ValueError("La question ne peut pas etre vide.")
+            raise ValueError("La question ne peut pas être vide.")
 
-        return self.chain.invoke(
-            {
-                "question": cleaned_question,
-                "parameters": parameters or QAParameters(),
-            }
-        )
-
-    def _retrieve_step(self, payload: dict[str, Any]) -> dict[str, Any]:
-        question = str(payload["question"])
-        parameters = payload["parameters"]
+        runtime_parameters = parameters or QAParameters()
         contexts = self.retriever.search(
-            question,
-            top_k=parameters.top_k,
-            max_score=parameters.retrieval_max_score,
-            candidate_multiplier=parameters.retrieval_candidate_multiplier,
+            cleaned_question,
+            top_k=runtime_parameters.top_k,
+            max_score=runtime_parameters.retrieval_max_score,
         )
-        return {
-            "question": question,
-            "contexts": contexts,
-            "parameters": parameters,
-        }
-
-    def _generation_step(self, payload: dict[str, Any]) -> QAResponse:
-        question = str(payload["question"])
-        contexts = payload["contexts"]
-        parameters = payload["parameters"]
-        answer = self.answer_generator.generate(
-            question,
+        answer_generator = self.answer_generator or build_answer_generator(
+            provider=runtime_parameters.llm_provider,
+            model=runtime_parameters.llm_model,
+        )
+        answer = answer_generator.generate(
+            cleaned_question,
             contexts,
-            temperature=parameters.temperature,
-            max_tokens=parameters.max_tokens,
+            temperature=runtime_parameters.temperature,
+            max_tokens=runtime_parameters.max_tokens,
         )
 
         return QAResponse(
-            question=question,
+            question=cleaned_question,
             answer=answer,
             sources=build_sources(contexts),
-            parameters=parameters,
+            parameters=runtime_parameters,
         )
 
 
 def build_sources(contexts: list[SearchResult]) -> list[AnswerSource]:
-    """Transforme les resultats de retrieval en sources exposees."""
+    """Transforme les résultats de retrieval en sources exposées."""
 
     sources: list[AnswerSource] = []
     for result in contexts:

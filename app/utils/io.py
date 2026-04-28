@@ -1,4 +1,4 @@
-"""Utilitaires d'entree / sortie.
+"""Utilitaires d'entrée / sortie.
 
 Ce module centralise les petites opérations fichier du projet.
 L'objectif est d'éviter de réécrire la lecture/écriture JSON dans chaque
@@ -23,7 +23,7 @@ def read_json(path: str | Path) -> Any:
     Returns
     -------
     Any
-        Contenu Python issu du JSON : liste, dictionnaire, chaine, etc.
+        Contenu Python issu du JSON : liste, dictionnaire, chaîne, etc.
     """
 
     file_path = Path(path)
@@ -49,7 +49,7 @@ def write_json(data: Any, path: str | Path) -> Path:
 
     output_path = Path(path)
 
-    # On cree le dossier parent pour permettre une execution depuis zero.
+    # On crée le dossier parent pour permettre une exécution depuis zéro.
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with output_path.open("w", encoding="utf-8") as file:

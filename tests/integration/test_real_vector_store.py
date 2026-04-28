@@ -10,19 +10,19 @@ from app.rag.vector_store import FaissVectorStore
 
 
 def test_real_vector_store_search_with_mistral_embeddings() -> None:
-    """Verifie une recherche sur l'index FAISS reel."""
+    """Vérifie une recherche sur l'index FAISS réel."""
 
     index_path = Path(settings.vector_store_dir) / "index.faiss"
     chunks_path = Path(settings.vector_store_dir) / "chunks.json"
 
     if not settings.mistral_api_key:
-        pytest.skip("MISTRAL_API_KEY non renseignee.")
+        pytest.skip("MISTRAL_API_KEY non renseignée.")
     if not index_path.exists() or not chunks_path.exists():
-        pytest.skip("Index FAISS reel absent. Lancer scripts/rebuild_index.py --index.")
+        pytest.skip("Index FAISS réel absent. Lancer scripts/rebuild_index.py --index.")
 
     vector_store = FaissVectorStore.load(settings.vector_store_dir, MistralEmbeddingModel())
     results = vector_store.search(
-        "Quels concerts de jazz sont disponibles a Paris ?",
+        "Quels concerts de jazz sont disponibles à Paris ?",
         top_k=3,
     )
 

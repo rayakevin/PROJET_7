@@ -1,4 +1,4 @@
-"""Entree racine exposant l'application FastAPI."""
+"""Entrée racine exposant l'application FastAPI."""
 
 from app.main import app
 

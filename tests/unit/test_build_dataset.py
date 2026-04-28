@@ -11,7 +11,7 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def test_build_dataset_writes_normalized_events(tmp_path) -> None:
-    """Verifie qu'un fichier brut devient un fichier normalise."""
+    """Vérifie qu'un fichier brut devient un fichier normalisé."""
 
     raw_events = json.loads((FIXTURES_DIR / "sample_events.json").read_text())
     raw_path = tmp_path / "raw" / "events_raw.json"

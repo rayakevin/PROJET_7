@@ -1,6 +1,6 @@
-"""Normalisation des évênements culturels.
+"""Normalisation des événements culturels.
 
-Ce module transforme des évênements bruts en dictionnaires propres,
+Ce module transforme des événements bruts en dictionnaires propres,
 stables et faciles à indexer dans une base vectorielle.
 
 Dans le pipeline RAG, cette étape sert de contrat entre :
@@ -65,7 +65,7 @@ def clean_text(value: Any) -> str:
     Returns
     -------
     str
-        Texte sans espaces superflux. Une valeur absente devient une chaîne
+        Texte sans espaces superflus. Une valeur absente devient une chaîne
         vide pour simplifier le reste du pipeline.
     """
 
@@ -172,7 +172,7 @@ def extract_city(raw_event: dict[str, Any]) -> str:
 
 
 def extract_start_end(raw_event: dict[str, Any]) -> tuple[str, str]:
-    """Extrait les dates de debut et fin depuis les horaires OpenAgenda."""
+    """Extrait les dates de début et fin depuis les horaires OpenAgenda."""
 
     start = clean_text(
         raw_event.get("start")
@@ -214,10 +214,10 @@ def build_full_text(event: NormalizedEvent) -> str:
 
     parts = [
         f"Titre : {event.title}",
-        f"Mots-cles : {', '.join(event.keywords)}",
+        f"Mots-clés : {', '.join(event.keywords)}",
         f"Ville : {event.city}",
         f"Lieu : {event.location_name}",
-        f"Debut : {event.start}",
+        f"Début : {event.start}",
         f"Fin : {event.end}",
         f"Description : {event.description}",
     ]

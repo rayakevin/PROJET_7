@@ -1,4 +1,4 @@
-"""Tests unitaires du filtrage des resultats FAISS."""
+"""Tests unitaires du filtrage des résultats FAISS."""
 
 from langchain_core.documents import Document
 
@@ -13,15 +13,17 @@ from app.rag.vector_store import (
 
 
 class FakeFaissStore:
-    """Store FAISS minimal pour tester le filtrage sans index reel."""
+    """Store FAISS minimal pour tester le filtrage sans index réel."""
 
     def similarity_search_with_score(
         self,
         query: str,
         k: int,
     ) -> list[tuple[Document, float]]:
+        """Retourne deux documents avec distances FAISS contrôlées."""
+
         assert query == "concert jazz"
-        assert k == 6
+        assert k == 3
         return [
             (
                 Document(
@@ -41,7 +43,7 @@ class FakeFaissStore:
 
 
 def test_search_filters_results_above_max_score() -> None:
-    """Verifie qu'un seuil retire les contextes trop eloignes."""
+    """Vérifie qu'un seuil retire les contextes trop éloignés."""
 
     vector_store = FaissVectorStore(store=FakeFaissStore(), chunks=[])
 
@@ -49,7 +51,6 @@ def test_search_filters_results_above_max_score() -> None:
         "concert jazz",
         top_k=3,
         max_score=0.45,
-        candidate_multiplier=2,
     )
 
     assert len(results) == 1
@@ -57,7 +58,7 @@ def test_search_filters_results_above_max_score() -> None:
 
 
 def test_search_keeps_best_result_when_threshold_filters_everything() -> None:
-    """Verifie le fallback pour eviter un contexte vide."""
+    """Vérifie le fallback pour éviter un contexte vide."""
 
     vector_store = FaissVectorStore(store=FakeFaissStore(), chunks=[])
 
@@ -65,7 +66,6 @@ def test_search_keeps_best_result_when_threshold_filters_everything() -> None:
         "concert jazz",
         top_k=3,
         max_score=0.1,
-        candidate_multiplier=2,
     )
 
     assert len(results) == 1
@@ -73,7 +73,7 @@ def test_search_keeps_best_result_when_threshold_filters_everything() -> None:
 
 
 def test_search_adds_lexical_candidates_from_metadata() -> None:
-    """Verifie que le reranking peut recuperer un candidat lexical."""
+    """Vérifie que le reranking peut récupérer un candidat lexical."""
 
     chunks = [
         TextChunk(
@@ -92,14 +92,13 @@ def test_search_adds_lexical_candidates_from_metadata() -> None:
         "concert jazz",
         top_k=3,
         max_score=None,
-        candidate_multiplier=2,
     )
 
     assert any(result.chunk.id == "evt-001::chunk-0" for result in results)
 
 
 def test_deduplicate_by_event_keeps_first_result() -> None:
-    """Verifie la diversification des sources par evenement."""
+    """Vérifie la diversification des sources par événement."""
 
     results = [
         SearchResult(
@@ -126,7 +125,7 @@ def test_deduplicate_by_event_keeps_first_result() -> None:
 
 
 def test_matches_query_focus_rejects_candidate_without_explicit_theme() -> None:
-    """Verifie qu'un theme culturel explicite reste discriminant."""
+    """Vérifie qu'un thème culturel explicite reste discriminant."""
 
     chunk = TextChunk(
         id="evt-001::chunk-0",
@@ -138,7 +137,7 @@ def test_matches_query_focus_rejects_candidate_without_explicit_theme() -> None:
 
 
 def test_matches_query_focus_accepts_young_public_alternative() -> None:
-    """Verifie le cas jeune public/enfant."""
+    """Vérifie le cas jeune public/enfant."""
 
     chunk = TextChunk(
         id="evt-001::chunk-0",
@@ -150,7 +149,7 @@ def test_matches_query_focus_accepts_young_public_alternative() -> None:
 
 
 def test_tokenize_normalizes_simple_plurals() -> None:
-    """Verifie la normalisation singulier/pluriel."""
+    """Vérifie la normalisation singulier/pluriel."""
 
     assert "exposition" in tokenize("Quelles expositions ?")
     assert "festival" in tokenize("Quels festivals ?")

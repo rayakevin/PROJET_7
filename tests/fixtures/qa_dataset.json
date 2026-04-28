@@ -1,22 +1,22 @@
 [
   {
-    "question": "Je cherche un concert de Gospel Jazz pour la Fete de la musique a Paris, que peux-tu me proposer ?",
-    "reference_answer": "Le Concert de Gospel Jazz est propose pour la Fete de la musique a Paris, au 132 avenue de Versailles, le 21 juin 2025. L'evenement met en avant du gospel et du jazz, avec un concert suivi d'un cocktail dinatoire."
+    "question": "Je cherche un concert de Gospel Jazz pour la Fête de la musique à Paris, que peux-tu me proposer ?",
+    "reference_answer": "Le Concert de Gospel Jazz est proposé pour la Fête de la musique à Paris, au 132 avenue de Versailles, le 21 juin 2025. L'événement met en avant du gospel et du jazz, avec un concert suivi d'un cocktail dînatoire."
   },
   {
-    "question": "Je veux faire une activite cosplay a la Cite des sciences et de l'Industrie, quels evenements existent ?",
-    "reference_answer": "A la Cite des sciences et de l'Industrie, plusieurs evenements cosplay existent : Cosplaymania - Confection de masques le 27 avril 2025, Cosplaymania - Concours et defile cosplay le 27 avril 2025, Arduino et cosplay le 25 novembre 2025, ainsi que Cosplaymania et Cosplaymania 3 le 8 mai 2026."
+    "question": "Je veux faire une activité cosplay à la Cité des sciences et de l'Industrie, quels événements existent ?",
+    "reference_answer": "À la Cité des sciences et de l'Industrie, plusieurs événements cosplay existent : Cosplaymania - Confection de masques le 27 avril 2025, Cosplaymania - Concours et défilé cosplay le 27 avril 2025, Arduino et cosplay le 25 novembre 2025, ainsi que Cosplaymania et Cosplaymania 3 le 8 mai 2026."
   },
   {
-    "question": "Je cherche un spectacle jeune public des 3 ans a Paris, as-tu une recommandation ?",
-    "reference_answer": "Le spectacle Englouti ! spectacle jeune public des 3 ans est une recommandation pertinente. Il se joue au Theatre Mandapa le 14 mai 2025 et propose un conte poetique avec marionnette et danse autour du theme de l'environnement."
+    "question": "Je cherche un spectacle jeune public dès 3 ans à Paris, as-tu une recommandation ?",
+    "reference_answer": "Le spectacle Englouti ! spectacle jeune public dès 3 ans est une recommandation pertinente. Il se joue au Théâtre Mandapa le 14 mai 2025 et propose un conte poétique avec marionnette et danse autour du thème de l'environnement."
   },
   {
-    "question": "Je voudrais voir une exposition autour de l'art japonais a Paris, que proposes-tu ?",
-    "reference_answer": "L'exposition L'ecologie des choses - Regards sur les artistes japonais et leurs environnements de 1970 a nos jours est proposee a la Maison de la culture du Japon a Paris le 17 mai 2025."
+    "question": "Je voudrais voir une exposition autour de l'art japonais à Paris, que proposes-tu ?",
+    "reference_answer": "L'exposition L'écologie des choses - Regards sur les artistes japonais et leurs environnements de 1970 à nos jours est proposée à la Maison de la culture du Japon à Paris le 17 mai 2025."
   },
   {
-    "question": "Y a-t-il une avant-premiere du film RED BIRD a Paris ?",
-    "reference_answer": "Oui, l'avant-premiere du film RED BIRD est prevue au Grand Rex a Paris le 6 janvier 2026 a 20h30, en presence de l'equipe du film."
+    "question": "Y a-t-il une avant-première du film RED BIRD à Paris ?",
+    "reference_answer": "Oui, l'avant-première du film RED BIRD est prévue au Grand Rex à Paris le 6 janvier 2026 à 20h30, en présence de l'équipe du film."
   }
 ]

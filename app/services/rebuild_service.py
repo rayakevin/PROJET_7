@@ -8,14 +8,14 @@ from pathlib import Path
 from app.config import settings
 from app.ingestion.build_dataset import DEFAULT_PROCESSED_EVENTS_FILENAME
 from app.rag.chunking import chunk_events
-from app.rag.embeddings import EmbeddingModel, MistralEmbeddingModel
+from app.rag.embeddings import EmbeddingModel, build_embedding_model
 from app.rag.vector_store import build_vector_store
 from app.utils.io import read_json
 
 
 @dataclass(frozen=True, slots=True)
 class RebuildIndexResult:
-    """Resume de reconstruction de l'index."""
+    """Résumé de reconstruction de l'index."""
 
     dataset_path: str
     vector_store_dir: str
@@ -23,7 +23,7 @@ class RebuildIndexResult:
     chunks_count: int
 
     def to_dict(self) -> dict[str, str | int]:
-        """Convertit le resultat en dictionnaire serialisable."""
+        """Convertit le résultat en dictionnaire sérialisable."""
 
         return asdict(self)
 
@@ -46,7 +46,7 @@ def rebuild_vector_index(
         events = events[:max_events]
 
     chunks = chunk_events(events)
-    model = embedding_model or MistralEmbeddingModel()
+    model = embedding_model or build_embedding_model()
     build_vector_store(chunks=chunks, embedding_model=model, output_dir=target_dir)
 
     return RebuildIndexResult(

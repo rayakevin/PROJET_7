@@ -1,4 +1,4 @@
-"""Point d'entree applicatif FastAPI."""
+"""Point d'entrée applicatif FastAPI."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from app.config import settings
 
 
 def create_app() -> FastAPI:
-    """Cree et configure l'application FastAPI."""
+    """Crée et configure l'application FastAPI."""
 
     app = FastAPI(
         title=settings.app_name,

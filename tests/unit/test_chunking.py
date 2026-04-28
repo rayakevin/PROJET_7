@@ -6,7 +6,7 @@ from app.rag.chunking import chunk_event, chunk_events, split_text
 
 
 def test_split_text_respects_size_and_overlap() -> None:
-    """Verifie le decoupage avec chevauchement."""
+    """Vérifie le découpage avec chevauchement."""
 
     text = " ".join(f"mot{i}" for i in range(40))
 
@@ -18,14 +18,14 @@ def test_split_text_respects_size_and_overlap() -> None:
 
 
 def test_split_text_rejects_invalid_parameters() -> None:
-    """Verifie la validation des parametres."""
+    """Vérifie la validation des paramètres."""
 
     with pytest.raises(ValueError):
         split_text("texte", chunk_size=100, chunk_overlap=100)
 
 
 def test_chunk_event_keeps_event_metadata() -> None:
-    """Verifie que les metadonnees metier suivent chaque chunk."""
+    """Vérifie que les métadonnées métier suivent chaque chunk."""
 
     event = {
         "uid": "evt-001",
@@ -48,7 +48,7 @@ def test_chunk_event_keeps_event_metadata() -> None:
 
 
 def test_chunk_events_flattens_all_chunks() -> None:
-    """Verifie le decoupage d'une liste d'evenements."""
+    """Vérifie le découpage d'une liste d'événements."""
 
     events = [
         {"uid": "evt-001", "full_text": "A" * 120},

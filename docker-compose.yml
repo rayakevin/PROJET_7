@@ -12,10 +12,12 @@ services:
       APP_PORT: 8000
       DATA_DIR: /app/data
       RAW_DATA_DIR: /app/data/raw
-      INTERIM_DATA_DIR: /app/data/interim
       PROCESSED_DATA_DIR: /app/data/processed
       VECTOR_STORE_DIR: /app/data/vector_store
       EVALUATION_DATA_DIR: /app/data/evaluation
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    volumes:
+      - ./data:/app/data
     ports:
       - "8000:8000"
 
@@ -28,6 +30,7 @@ services:
       - .env
     environment:
       API_BASE_URL: http://rag-api:8000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
     command: >
       streamlit run ui/streamlit_app.py
       --server.address 0.0.0.0

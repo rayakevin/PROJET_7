@@ -1,4 +1,4 @@
-"""Adaptateur LangChain pour le modele de chat Mistral."""
+"""Adaptateur LangChain pour le modèle de chat Mistral."""
 
 from __future__ import annotations
 
@@ -25,13 +25,13 @@ class MistralChatModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        """Identifiant technique du modele."""
+        """Identifiant technique du modèle."""
 
         return "mistral-chat"
 
     @property
     def _identifying_params(self) -> dict[str, Any]:
-        """Parametres utiles pour le tracing LangChain."""
+        """Paramètres utiles pour le tracing LangChain."""
 
         return {
             "model": self.model,
@@ -46,7 +46,7 @@ class MistralChatModel(BaseChatModel):
         run_manager: Any | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """Appelle l'API chat Mistral et retourne un resultat LangChain."""
+        """Appelle l'API chat Mistral et retourne un résultat LangChain."""
 
         del stop, run_manager, kwargs
         client = Mistral(api_key=self.api_key)
@@ -72,7 +72,7 @@ class MistralChatModel(BaseChatModel):
                     raise
                 time.sleep(self.retry_sleep_seconds)
 
-        raise RuntimeError("Echec inattendu lors de l'appel au modele Mistral.")
+        raise RuntimeError("Échec inattendu lors de l'appel au modèle Mistral.")
 
 
 def to_mistral_role(message: BaseMessage) -> str:
