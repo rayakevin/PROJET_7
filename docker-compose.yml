@@ -1,0 +1,20 @@
+services:
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: projet7-rag-api:latest
+    env_file:
+      - .env
+    environment:
+      APP_ENV: docker
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      DATA_DIR: /app/data
+      RAW_DATA_DIR: /app/data/raw
+      INTERIM_DATA_DIR: /app/data/interim
+      PROCESSED_DATA_DIR: /app/data/processed
+      VECTOR_STORE_DIR: /app/data/vector_store
+      EVALUATION_DATA_DIR: /app/data/evaluation
+    ports:
+      - "8000:8000"

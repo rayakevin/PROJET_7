@@ -158,6 +158,38 @@ Test fonctionnel manuel :
 python scripts/api_test.py
 ```
 
+## Docker
+
+L'image Docker embarque l'API et les artefacts locaux presents dans `data/`.
+Docker Desktop doit etre lance avant le build.
+Pour une demo fluide, construire l'index avant le build :
+
+```bash
+python scripts/rebuild_index.py --index
+```
+
+Construire puis lancer l'API :
+
+```bash
+docker build -t projet7-rag-api .
+docker run --rm --env-file .env -p 8000:8000 projet7-rag-api
+```
+
+Avec Docker Compose :
+
+```bash
+docker compose up --build
+```
+
+Verification :
+
+```bash
+curl http://127.0.0.1:8000/health
+python scripts/api_test.py
+```
+
+Le guide de demo est disponible dans `docs/soutenance/demo_docker.md`.
+
 ## Evaluation
 
 Le jeu de test annote se trouve dans `tests/fixtures/qa_dataset.json`.
@@ -196,7 +228,7 @@ Le rapport expose les noms internes Ragas et un resume lisible dans
 }
 ```
 
-Dernier resultat observe sur 3 questions annotees :
+Dernier resultat observe sur 5 questions annotees :
 
 ```text
 Faithfulness: 0.9417
@@ -225,6 +257,7 @@ Sources moyennes: 3.0
 | `VECTOR_STORE_DIR` | Index vectoriel |
 | `TOP_K` | Nombre maximum de chunks retournes, par defaut `3` |
 | `RETRIEVAL_MAX_SCORE` | Distance FAISS maximale conservee, par defaut `0.45` |
+| `RETRIEVAL_CANDIDATE_MULTIPLIER` | Nombre de candidats FAISS avant reranking |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | Decoupage documentaire |
 
 ## Stack prevue
@@ -234,5 +267,5 @@ Sources moyennes: 3.0
 
 ## Prochaine sequence
 
-1. Preparer la demonstration Docker locale.
-2. Rediger le rapport technique et les slides de soutenance.
+1. Tester le build Docker apres lancement de Docker Desktop.
+2. Finaliser le rapport technique.
