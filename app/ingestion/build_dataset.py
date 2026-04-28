@@ -20,7 +20,7 @@ def build_dataset(
     output_path: str | Path | None = None,
     quality_report_path: str | Path | None = None,
 ) -> Path:
-    """Construit le dataset normalise et son rapport qualite."""
+    """Construit le dataset normalisé et son rapport qualité."""
 
     source_path = Path(raw_events_path or settings.raw_data_dir / DEFAULT_RAW_EVENTS_FILENAME)
     target_path = Path(output_path or settings.processed_data_dir / DEFAULT_PROCESSED_EVENTS_FILENAME)

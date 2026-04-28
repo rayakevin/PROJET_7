@@ -6,22 +6,30 @@ from app.clients.opendatasoft_client import OpenDataSoftEventsClient
 
 
 class FakeResponse:
-    """Reponse HTTP minimale pour les tests."""
+    """Réponse HTTP minimale pour les tests."""
 
     def __init__(self, payload: dict[str, Any]) -> None:
+        """Stocke le JSON qui sera retourné par la fausse réponse."""
+
         self._payload = payload
 
     def json(self) -> dict[str, Any]:
+        """Retourne le payload de test."""
+
         return self._payload
 
     def raise_for_status(self) -> None:
+        """Simule une réponse HTTP sans erreur."""
+
         return None
 
 
 class FakeSession:
-    """Session HTTP minimale pour capturer les parametres envoyes."""
+    """Session HTTP minimale pour capturer les paramètres envoyés."""
 
     def __init__(self) -> None:
+        """Prépare la liste des appels HTTP capturés."""
+
         self.calls: list[dict[str, Any]] = []
 
     def get(
@@ -30,6 +38,8 @@ class FakeSession:
         params: dict[str, str | int],
         timeout: int,
     ) -> FakeResponse:
+        """Capture l'appel GET et retourne une page OpenDataSoft factice."""
+
         self.calls.append({"url": url, "params": params, "timeout": timeout})
         return FakeResponse(
             {
@@ -47,7 +57,7 @@ class FakeSession:
 
 
 def test_opendatasoft_client_builds_filtered_request() -> None:
-    """Verifie la construction d'un appel filtre vers OpenDataSoft."""
+    """Vérifie la construction d'un appel filtré vers OpenDataSoft."""
 
     client = OpenDataSoftEventsClient(
         records_url="https://example.test/records",

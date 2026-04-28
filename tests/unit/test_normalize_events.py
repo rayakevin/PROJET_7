@@ -1,4 +1,4 @@
-"""Tests unitaires de normalisation des evenements."""
+"""Tests unitaires de normalisation des événements."""
 
 import json
 from pathlib import Path
@@ -15,13 +15,13 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def test_clean_text_removes_extra_spaces() -> None:
-    """Verifie que le nettoyage compacte les espaces inutiles."""
+    """Vérifie que le nettoyage compacte les espaces inutiles."""
 
     assert clean_text("  Festival\n jazz\t gratuit  ") == "Festival jazz gratuit"
 
 
 def test_normalize_keywords_returns_unique_lowercase_values() -> None:
-    """Verifie le nettoyage, la casse et la deduplication des mots-cles."""
+    """Vérifie le nettoyage, la casse et la déduplication des mots-clés."""
 
     keywords = normalize_keywords([" Jazz ", "concert", "JAZZ", ""])
 
@@ -29,7 +29,7 @@ def test_normalize_keywords_returns_unique_lowercase_values() -> None:
 
 
 def test_normalize_event_builds_full_text() -> None:
-    """Verifie qu'un evenement brut devient un document indexable."""
+    """Vérifie qu'un événement brut devient un document indexable."""
 
     raw_event = {
         "uid": "evt-001",
@@ -48,13 +48,13 @@ def test_normalize_event_builds_full_text() -> None:
     assert normalized_event["keywords"] == ["jazz", "concert"]
     assert "Festival jazz en plein air" in normalized_event["full_text"]
     assert "Paris" in normalized_event["full_text"]
-    assert normalized_event["full_text"].index("Mots-cles") < normalized_event[
+    assert normalized_event["full_text"].index("Mots-clés") < normalized_event[
         "full_text"
     ].index("Description")
 
 
 def test_normalize_event_supports_opendatasoft_shape() -> None:
-    """Verifie la normalisation du dataset OpenDataSoft OpenAgenda."""
+    """Vérifie la normalisation du dataset OpenDataSoft OpenAgenda."""
 
     raw_event = {
         "uid": "81452007",
@@ -62,7 +62,7 @@ def test_normalize_event_supports_opendatasoft_shape() -> None:
         "description_fr": "Un atelier avec une cosplayeuse.",
         "longdescription_fr": "<p>Venez decouvrir la mousse EVA.</p>",
         "keywords_fr": ["cosplay", "creation"],
-        "location_name": "Cite des sciences",
+        "location_name": "Cité des sciences",
         "location_city": "Paris",
         "firstdate_begin": "2025-04-27T09:00:00+00:00",
         "firstdate_end": "2025-04-27T11:00:00+00:00",
@@ -72,7 +72,7 @@ def test_normalize_event_supports_opendatasoft_shape() -> None:
 
     assert normalized_event["uid"] == "81452007"
     assert normalized_event["title"] == "Cosplaymania"
-    assert normalized_event["location_name"] == "Cite des sciences"
+    assert normalized_event["location_name"] == "Cité des sciences"
     assert normalized_event["city"] == "Paris"
     assert normalized_event["start"] == "2025-04-27T09:00:00+00:00"
     assert normalized_event["end"] == "2025-04-27T11:00:00+00:00"
@@ -82,7 +82,7 @@ def test_normalize_event_supports_opendatasoft_shape() -> None:
 
 
 def test_normalize_events_works_with_fixture() -> None:
-    """Verifie la normalisation de la fixture d'evenements."""
+    """Vérifie la normalisation de la fixture d'événements."""
 
     raw_events = json.loads((FIXTURES_DIR / "sample_events.json").read_text())
 

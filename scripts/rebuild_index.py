@@ -20,12 +20,12 @@ def parse_args() -> argparse.Namespace:
     """Parse les arguments de ligne de commande."""
 
     parser = argparse.ArgumentParser(
-        description="Recupere et/ou normalise les evenements du POC."
+        description="Récupère et/ou normalise les événements du POC."
     )
     parser.add_argument(
         "--fetch",
         action="store_true",
-        help="Recupere les evenements publics OpenAgenda via OpenDataSoft.",
+        help="Récupère les événements publics OpenAgenda via OpenDataSoft.",
     )
     parser.add_argument(
         "--city",
@@ -41,13 +41,13 @@ def parse_args() -> argparse.Namespace:
         "--keyword",
         action="append",
         default=None,
-        help="Mot-cle optionnel. Peut etre repete plusieurs fois.",
+        help="Mot-clé optionnel. Peut être répété plusieurs fois.",
     )
     parser.add_argument(
         "--raw-events-path",
         type=Path,
         default=None,
-        help="Chemin du fichier JSON brut lu ou ecrit. Defaut : data/raw/events_raw.json",
+        help="Chemin du fichier JSON brut lu ou écrit. Défaut : data/raw/events_raw.json",
     )
     parser.add_argument(
         "--output-path",
@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
         "--quality-report-path",
         type=Path,
         default=None,
-        help="Chemin du rapport qualite. Defaut : data/processed/events_quality_report.json",
+        help="Chemin du rapport qualité. Défaut : data/processed/events_quality_report.json",
     )
     parser.add_argument(
         "--index",
@@ -70,19 +70,19 @@ def parse_args() -> argparse.Namespace:
         "--vector-store-dir",
         type=Path,
         default=None,
-        help="Dossier de sortie de l'index FAISS. Defaut : data/vector_store.",
+        help="Dossier de sortie de l'index FAISS. Défaut : data/vector_store.",
     )
     parser.add_argument(
         "--max-events",
         type=int,
         default=None,
-        help="Limite optionnelle d'evenements a indexer pour un test rapide.",
+        help="Limite optionnelle d'événements à indexer pour un test rapide.",
     )
     return parser.parse_args()
 
 
 def main() -> int:
-    """Execute la construction du dataset depuis le terminal."""
+    """Exécute la construction du dataset depuis le terminal."""
 
     args = parse_args()
     raw_events_path = args.raw_events_path
@@ -94,7 +94,7 @@ def main() -> int:
             search=args.search,
             keywords=args.keyword,
         )
-        print(f"Evenements bruts ecrits : {raw_events_path}")
+        print(f"Événements bruts écrits : {raw_events_path}")
 
     output_path = build_dataset(
         raw_events_path=raw_events_path,
@@ -102,7 +102,7 @@ def main() -> int:
         quality_report_path=args.quality_report_path,
     )
 
-    print(f"Dataset normalise ecrit : {output_path}")
+    print(f"Dataset normalisé écrit : {output_path}")
 
     if args.index:
         result = rebuild_vector_index(
@@ -110,8 +110,8 @@ def main() -> int:
             vector_store_dir=args.vector_store_dir,
             max_events=args.max_events,
         )
-        print(f"Index vectoriel ecrit : {result.vector_store_dir}")
-        print(f"Chunks indexes : {result.chunks_count}")
+        print(f"Index vectoriel écrit : {result.vector_store_dir}")
+        print(f"Chunks indexés : {result.chunks_count}")
 
     return 0
 

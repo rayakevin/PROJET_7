@@ -16,6 +16,8 @@ class FakeRetriever:
     """Retriever de test sans index."""
 
     def retrieve(self, question: str) -> list[SearchResult]:
+        """Retourne un contexte stable pour la question de test."""
+
         return [
             SearchResult(
                 chunk=TextChunk(
@@ -36,10 +38,12 @@ class FakeRetriever:
 
 
 class FakeAnswerGenerator:
-    """Generateur de test sans appel LLM."""
+    """Générateur de test sans appel LLM."""
 
     def generate(self, question: str, contexts: list[SearchResult]) -> str:
-        return "Concert jazz au JASS CLUB a Paris."
+        """Retourne une réponse fixe sans appeler Mistral."""
+
+        return "Concert jazz au JASS CLUB à Paris."
 
 
 class FakeQAService:
@@ -50,40 +54,40 @@ class FakeQAService:
 
 
 def test_compute_local_metrics_includes_source_count() -> None:
-    """Verifie les metriques locales principales."""
+    """Vérifie les métriques locales principales."""
 
     contexts = FakeRetriever().retrieve("question")
 
     metrics = compute_local_metrics(
-        prediction="Concert jazz au JASS CLUB a Paris.",
-        reference="Concert jazz a Paris.",
+        prediction="Concert jazz au JASS CLUB à Paris.",
+        reference="Concert jazz à Paris.",
         contexts=contexts,
     )
 
-    assert set(metrics) == {"source_count", "avg_retrieval_score"}
+    assert set(metrics) == {"source_count", "avg_retrieval_distance"}
     assert metrics["source_count"] == 1.0
-    assert metrics["avg_retrieval_score"] == 0.25
+    assert metrics["avg_retrieval_distance"] == 0.25
 
 
 def test_run_predictions_builds_evaluation_rows() -> None:
-    """Verifie la collecte des predictions RAG."""
+    """Vérifie la collecte des prédictions RAG."""
 
     predictions = run_predictions(
-        [EvaluationExample("Quels concerts jazz ?", "Concert jazz a Paris.")],
+        [EvaluationExample("Quels concerts jazz ?", "Concert jazz à Paris.")],
         qa_service=FakeQAService(),
     )
 
     assert len(predictions) == 1
-    assert predictions[0].answer == "Concert jazz au JASS CLUB a Paris."
+    assert predictions[0].answer == "Concert jazz au JASS CLUB à Paris."
     assert predictions[0].sources[0]["title"] == "Concert jazz"
     assert predictions[0].contexts
 
 
 def test_build_report_summarizes_predictions() -> None:
-    """Verifie la structure du rapport final."""
+    """Vérifie la structure du rapport final."""
 
     predictions = run_predictions(
-        [EvaluationExample("Quels concerts jazz ?", "Concert jazz a Paris.")],
+        [EvaluationExample("Quels concerts jazz ?", "Concert jazz à Paris.")],
         qa_service=FakeQAService(),
     )
 
@@ -95,10 +99,10 @@ def test_build_report_summarizes_predictions() -> None:
 
 
 def test_build_report_includes_required_ragas_metrics() -> None:
-    """Verifie les alias des metriques attendues par la grille."""
+    """Vérifie les alias des métriques attendues par la grille."""
 
     predictions = run_predictions(
-        [EvaluationExample("Quels concerts jazz ?", "Concert jazz a Paris.")],
+        [EvaluationExample("Quels concerts jazz ?", "Concert jazz à Paris.")],
         qa_service=FakeQAService(),
     )
     ragas_report = {
@@ -125,7 +129,7 @@ def test_build_report_includes_required_ragas_metrics() -> None:
 
 
 def test_build_required_metrics_summary_maps_ragas_names() -> None:
-    """Verifie la traduction des noms internes Ragas."""
+    """Vérifie la traduction des noms internes Ragas."""
 
     summary = build_required_metrics_summary(
         {
@@ -143,7 +147,7 @@ def test_build_required_metrics_summary_maps_ragas_names() -> None:
 
 
 def test_load_examples_reads_fixture(tmp_path) -> None:
-    """Verifie le chargement d'un jeu annote."""
+    """Vérifie le chargement d'un jeu annoté."""
 
     dataset_path = tmp_path / "qa.json"
     dataset_path.write_text(

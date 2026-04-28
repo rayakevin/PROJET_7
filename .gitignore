@@ -40,19 +40,13 @@ Thumbs.db
 
 # Local data artifacts
 data/raw/*
-data/interim/*
 data/processed/*
 data/vector_store/*
 data/evaluation/results/*
 
-# Keep directory structure
-!data/raw/.gitkeep
-!data/interim/.gitkeep
-!data/processed/.gitkeep
-!data/vector_store/.gitkeep
-!data/evaluation/.gitkeep
-!data/evaluation/results/.gitkeep
-
 # Logs
 *.log
 logs/
+
+# Documentation personnelle de préparation soutenance
+docs_perso/

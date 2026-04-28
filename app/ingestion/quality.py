@@ -1,4 +1,4 @@
-"""Controle qualite du dataset normalise."""
+"""Contrôle qualité du dataset normalisé."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ REQUIRED_FIELDS = [
 
 
 def is_present(value: Any) -> bool:
-    """Indique si une valeur normalisee contient une information exploitable."""
+    """Indique si une valeur normalisée contient une information exploitable."""
 
     return value is not None and str(value).strip() != ""
 
@@ -27,7 +27,7 @@ def assess_events_quality(
     events: list[dict[str, Any]],
     min_full_text_chars: int = 120,
 ) -> dict[str, Any]:
-    """Calcule des indicateurs qualite pour le dataset normalise."""
+    """Calcule des indicateurs qualité pour le dataset normalisé."""
 
     total_events = len(events)
     missing_counts = {

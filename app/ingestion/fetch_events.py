@@ -1,4 +1,4 @@
-"""Recuperation des evenements bruts depuis OpenDataSoft."""
+"""Récupération des événements bruts depuis OpenDataSoft."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ DEFAULT_RAW_EVENTS_FILENAME = "events_raw.json"
 
 
 class EventsClient(Protocol):
-    """Contrat minimal attendu pour recuperer des evenements."""
+    """Contrat minimal attendu pour récupérer des événements."""
 
     def build_default_query(
         self,
@@ -22,10 +22,10 @@ class EventsClient(Protocol):
         search: str | None = None,
         keywords: list[str] | None = None,
     ) -> EventsQuery:
-        """Construit une requete par defaut."""
+        """Construit une requête par défaut."""
 
     def list_events(self, query: EventsQuery) -> list[dict]:
-        """Retourne les evenements correspondant a la requete."""
+        """Retourne les événements correspondant à la requête."""
 
 
 def fetch_events(
@@ -35,7 +35,7 @@ def fetch_events(
     keywords: list[str] | None = None,
     client: EventsClient | None = None,
 ) -> Path:
-    """Recupere les evenements publics et les sauvegarde en JSON brut."""
+    """Récupère les événements publics et les sauvegarde en JSON brut."""
 
     events_client = client or OpenDataSoftEventsClient()
     query = events_client.build_default_query(

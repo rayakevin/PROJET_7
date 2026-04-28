@@ -1,4 +1,4 @@
-"""Tests unitaires de recuperation des evenements bruts."""
+"""Tests unitaires de récupération des événements bruts."""
 
 from typing import Any
 
@@ -8,9 +8,11 @@ from app.utils.io import read_json
 
 
 class FakeEventsClient:
-    """Faux client utilise pour tester sans reseau."""
+    """Faux client utilisé pour tester sans réseau."""
 
     def __init__(self) -> None:
+        """Prépare la capture de la dernière requête reçue."""
+
         self.last_query: EventsQuery | None = None
 
     def build_default_query(
@@ -19,6 +21,8 @@ class FakeEventsClient:
         search: str | None = None,
         keywords: list[str] | None = None,
     ) -> EventsQuery:
+        """Construit une requête de test et la mémorise."""
+
         query = EventsQuery(
             city=city,
             search=search,
@@ -28,6 +32,8 @@ class FakeEventsClient:
         return query
 
     def list_events(self, query: EventsQuery) -> list[dict[str, Any]]:
+        """Retourne un événement minimal sans appel réseau."""
+
         return [
             {
                 "uid": "evt-001",
@@ -38,7 +44,7 @@ class FakeEventsClient:
 
 
 def test_fetch_events_writes_raw_events(tmp_path) -> None:
-    """Verifie que les evenements recuperes sont ecrits en JSON brut."""
+    """Vérifie que les événements récupérés sont écrits en JSON brut."""
 
     output_path = tmp_path / "raw" / "events_raw.json"
     client = FakeEventsClient()

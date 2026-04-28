@@ -1,7 +1,7 @@
 [project]
 name = "projet-7"
 version = "0.1.0"
-description = "POC RAG pour des recommandations d'evenements culturels a partir d'OpenAgenda."
+description = "POC RAG pour des recommandations d'événements culturels à partir d'OpenAgenda."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [

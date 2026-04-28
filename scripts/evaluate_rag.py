@@ -1,4 +1,4 @@
-"""Evaluation automatique du systeme RAG."""
+"""Évaluation automatique du système RAG."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ DEFAULT_QA_DATASET_PATH = PROJECT_ROOT / "tests" / "fixtures" / "qa_dataset.json
 
 @dataclass(frozen=True, slots=True)
 class EvaluationExample:
-    """Question annotee pour l'evaluation."""
+    """Question annotée pour l'évaluation."""
 
     question: str
     reference_answer: str
@@ -44,7 +44,7 @@ class EvaluationExample:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationPrediction:
-    """Prediction RAG et contexte associe."""
+    """Prédiction RAG et contexte associé."""
 
     question: str
     reference_answer: str
@@ -62,24 +62,24 @@ def parse_args() -> argparse.Namespace:
         "--dataset-path",
         type=Path,
         default=DEFAULT_QA_DATASET_PATH,
-        help="Chemin du jeu de test annote.",
+        help="Chemin du jeu de test annoté.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=settings.evaluation_data_dir / "results",
-        help="Dossier de sortie du rapport d'evaluation.",
+        help="Dossier de sortie du rapport d'évaluation.",
     )
     parser.add_argument(
         "--skip-ragas",
         action="store_true",
-        help="Ignore les metriques Ragas qui utilisent les embeddings Mistral.",
+        help="Ignore les métriques Ragas qui utilisent un juge LLM externe.",
     )
     return parser.parse_args()
 
 
 def load_examples(path: str | Path) -> list[EvaluationExample]:
-    """Charge le jeu de test annote."""
+    """Charge le jeu de test annoté."""
 
     rows = read_json(path)
     return [
@@ -95,7 +95,7 @@ def run_predictions(
     examples: list[EvaluationExample],
     qa_service: QAService | None = None,
 ) -> list[EvaluationPrediction]:
-    """Interroge le systeme RAG sur chaque question annotee."""
+    """Interroge le système RAG sur chaque question annotée."""
 
     service = qa_service or QAService()
     predictions: list[EvaluationPrediction] = []
@@ -126,12 +126,16 @@ def compute_local_metrics(
     reference: str,
     contexts: list[SearchResult],
 ) -> dict[str, float]:
-    """Calcule des metriques rapides centrees sur le retrieval."""
+    """Calcule des métriques rapides centrées sur le retrieval.
+
+    La distance FAISS moyenne est indicative : plus elle est basse, plus les
+    sources retenues sont proches de la question.
+    """
 
     del prediction, reference
     return {
         "source_count": float(len(contexts)),
-        "avg_retrieval_score": round(
+        "avg_retrieval_distance": round(
             sum(result.score for result in contexts) / len(contexts),
             4,
         )
@@ -143,10 +147,10 @@ def compute_local_metrics(
 def run_ragas_metrics(
     predictions: list[EvaluationPrediction],
 ) -> dict[str, Any]:
-    """Calcule les metriques Ragas disponibles pour le POC."""
+    """Calcule les métriques Ragas disponibles pour le POC."""
 
     if not settings.mistral_api_key:
-        raise ValueError("MISTRAL_API_KEY doit etre renseignee pour lancer Ragas.")
+        raise ValueError("MISTRAL_API_KEY doit être renseignée pour lancer Ragas.")
 
     dataset = EvaluationDataset(
         samples=[
@@ -161,6 +165,9 @@ def run_ragas_metrics(
     )
     embeddings = LangChainEmbeddingAdapter(MistralEmbeddingModel())
     with warnings.catch_warnings():
+        # Ragas accepte encore ce wrapper LangChain malgré l'avertissement de
+        # dépréciation. On masque seulement cet avertissement connu pour garder
+        # un rapport d'évaluation lisible.
         warnings.filterwarnings(
             "ignore",
             message="LangchainLLMWrapper is deprecated.*",
@@ -201,7 +208,7 @@ def summarize_metric_rows(
     rows: list[dict[str, Any]],
     metric_names: list[str],
 ) -> dict[str, float]:
-    """Agrege les lignes Ragas par nom de metrique."""
+    """Agrège les lignes Ragas par nom de métrique."""
 
     return {
         metric_name: round(
@@ -215,7 +222,7 @@ def summarize_metric_rows(
 
 
 def to_finite_float(value: Any) -> float:
-    """Convertit une valeur de metrique en float JSON-compatible."""
+    """Convertit une valeur de métrique en float JSON-compatible."""
 
     try:
         converted = float(value)
@@ -225,7 +232,7 @@ def to_finite_float(value: Any) -> float:
 
 
 def build_required_metrics_summary(summary: dict[str, float]) -> dict[str, float | None]:
-    """Expose les metriques attendues par la grille avec des noms lisibles."""
+    """Expose les métriques attendues par la grille avec des noms lisibles."""
 
     return {
         "faithfulness": summary.get("faithfulness"),
@@ -238,7 +245,7 @@ def summarize_predictions(
     predictions: list[EvaluationPrediction],
     ragas_report: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Agrege les metriques par question en resume global."""
+    """Agrège les métriques par question en résumé global."""
 
     local_metric_names = predictions[0].metrics.keys() if predictions else []
     summary: dict[str, Any] = {
@@ -264,7 +271,7 @@ def build_report(
     predictions: list[EvaluationPrediction],
     ragas_report: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Construit le rapport final serialisable."""
+    """Construit le rapport final sérialisable."""
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
@@ -285,7 +292,7 @@ def build_report(
 
 
 def write_report(report: dict[str, Any], output_dir: str | Path) -> Path:
-    """Ecrit un rapport horodate et une copie latest."""
+    """Écrit un rapport horodaté et une copie latest."""
 
     target_dir = Path(output_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -298,7 +305,7 @@ def write_report(report: dict[str, Any], output_dir: str | Path) -> Path:
 
 
 def main() -> int:
-    """Execute l'evaluation RAG."""
+    """Exécute l'évaluation RAG."""
 
     args = parse_args()
     examples = load_examples(args.dataset_path)
@@ -307,13 +314,13 @@ def main() -> int:
     report = build_report(predictions, ragas_report)
     report_path = write_report(report, args.output_dir)
 
-    print(f"Rapport d'evaluation ecrit : {report_path}")
-    print(f"Questions evaluees : {report['summary']['questions_count']}")
-    print(f"Metriques locales : {report['summary']['local_metrics']}")
+    print(f"Rapport d'évaluation écrit : {report_path}")
+    print(f"Questions évaluées : {report['summary']['questions_count']}")
+    print(f"Métriques locales : {report['summary']['local_metrics']}")
     if ragas_report is not None:
-        print(f"Metriques Ragas : {report['summary']['ragas_metrics']}")
+        print(f"Métriques Ragas : {report['summary']['ragas_metrics']}")
         print(
-            "Metriques attendues : "
+            "Métriques attendues : "
             f"{report['summary']['required_ragas_metrics']}"
         )
 

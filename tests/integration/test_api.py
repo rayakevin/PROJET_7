@@ -12,6 +12,8 @@ class FakeQAService:
     """Service QA de test sans appel Mistral."""
 
     def __init__(self) -> None:
+        """Mémorise les paramètres reçus par le faux service."""
+
         self.last_parameters: QAParameters | None = None
 
     def ask(
@@ -19,10 +21,12 @@ class FakeQAService:
         question: str,
         parameters: QAParameters | None = None,
     ) -> QAResponse:
+        """Retourne une réponse stable sans appeler le vrai RAG."""
+
         self.last_parameters = parameters
         return QAResponse(
             question=question,
-            answer="Voici une reponse de test.",
+            answer="Voici une réponse de test.",
             sources=[
                 AnswerSource(
                     chunk_id="evt-001::chunk-0",
@@ -39,8 +43,22 @@ class FakeQAService:
         )
 
 
+class RuntimeErrorQAService:
+    """Service QA qui simule une erreur de génération ou de retrieval."""
+
+    def ask(
+        self,
+        question: str,
+        parameters: QAParameters | None = None,
+    ) -> QAResponse:
+        """Déclenche une erreur applicative volontaire."""
+
+        del question, parameters
+        raise RuntimeError("Erreur LLM simulée.")
+
+
 def test_health_endpoint_returns_status() -> None:
-    """Verifie le endpoint de disponibilite."""
+    """Vérifie le endpoint de disponibilité."""
 
     client = TestClient(app)
 
@@ -52,8 +70,23 @@ def test_health_endpoint_returns_status() -> None:
     assert "vector_store_ready" in payload
 
 
+def test_metadata_endpoint_returns_public_configuration() -> None:
+    """Vérifie que /metadata expose la configuration sans secret."""
+
+    client = TestClient(app)
+
+    response = client.get("/metadata")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source_dataset_url"].startswith("https://")
+    assert payload["embedding_model"]
+    assert "mistral_api_key" not in payload
+    assert "api_rebuild_token" not in payload
+
+
 def test_ask_endpoint_returns_rag_answer() -> None:
-    """Verifie le endpoint /ask avec un service QA remplace."""
+    """Vérifie le endpoint /ask avec un service QA remplacé."""
 
     app.dependency_overrides[routes.get_qa_service] = lambda: FakeQAService()
     client = TestClient(app)
@@ -63,13 +96,13 @@ def test_ask_endpoint_returns_rag_answer() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     payload = response.json()
-    assert payload["answer"] == "Voici une reponse de test."
+    assert payload["answer"] == "Voici une réponse de test."
     assert payload["sources"][0]["title"] == "Concert jazz"
     assert payload["parameters"]["top_k"] is None
 
 
 def test_ask_endpoint_accepts_runtime_parameters() -> None:
-    """Verifie que /ask accepte les hyperparametres exposes a l'UI."""
+    """Vérifie que /ask accepte les hyperparamètres exposés à l'UI."""
 
     fake_service = FakeQAService()
     app.dependency_overrides[routes.get_qa_service] = lambda: fake_service
@@ -81,7 +114,6 @@ def test_ask_endpoint_accepts_runtime_parameters() -> None:
             "question": "Quels concerts jazz ?",
             "top_k": 4,
             "retrieval_max_score": 0.5,
-            "retrieval_candidate_multiplier": 6,
             "temperature": 0.4,
             "max_tokens": 500,
         },
@@ -94,14 +126,13 @@ def test_ask_endpoint_accepts_runtime_parameters() -> None:
     assert fake_service.last_parameters == QAParameters(
         top_k=4,
         retrieval_max_score=0.5,
-        retrieval_candidate_multiplier=6,
         temperature=0.4,
         max_tokens=500,
     )
 
 
 def test_ask_endpoint_rejects_empty_question() -> None:
-    """Verifie la validation des questions vides."""
+    """Vérifie la validation des questions vides."""
 
     client = TestClient(app)
 
@@ -110,16 +141,91 @@ def test_ask_endpoint_rejects_empty_question() -> None:
     assert response.status_code == 422
 
 
+def test_ask_endpoint_rejects_invalid_llm_provider() -> None:
+    """Vérifie la validation Pydantic du fournisseur LLM."""
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Quels concerts jazz ?",
+            "llm_provider": "local-inconnu",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_ask_endpoint_rejects_out_of_range_parameters() -> None:
+    """Vérifie la validation des bornes des hyperparamètres."""
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Quels concerts jazz ?",
+            "top_k": 0,
+            "temperature": 2.0,
+            "max_tokens": 50,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_ask_endpoint_returns_503_when_service_initialization_fails(
+    monkeypatch,
+) -> None:
+    """Vérifie le 503 propre si le service QA ne peut pas se charger."""
+
+    class MissingIndexQAService:
+        """Service QA qui simule un index absent au chargement."""
+
+        def __init__(self) -> None:
+            """Déclenche une erreur d'index absent."""
+
+            raise FileNotFoundError("index.faiss")
+
+    routes.reset_qa_service_cache()
+    monkeypatch.setattr(routes, "QAService", MissingIndexQAService)
+    client = TestClient(app)
+
+    response = client.post("/ask", json={"question": "Quels concerts jazz ?"})
+
+    routes.reset_qa_service_cache()
+    assert response.status_code == 503
+    assert "Index vectoriel absent" in response.json()["detail"]
+
+
+def test_ask_endpoint_returns_503_when_service_runtime_fails() -> None:
+    """Vérifie le 503 propre si la chaîne RAG échoue pendant /ask."""
+
+    app.dependency_overrides[routes.get_qa_service] = lambda: RuntimeErrorQAService()
+    client = TestClient(app)
+
+    response = client.post("/ask", json={"question": "Quels concerts jazz ?"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Erreur LLM simulée."
+
+
 def test_rebuild_endpoint_runs_pipeline(monkeypatch, tmp_path) -> None:
-    """Verifie le endpoint /rebuild sans appel externe."""
+    """Vérifie le endpoint /rebuild sans appel externe."""
 
     monkeypatch.setattr(routes.settings, "api_rebuild_token", "")
     dataset_path = tmp_path / "events_processed.json"
 
     def fake_build_dataset(raw_events_path=None):
+        """Remplace la construction du dataset pendant le test API."""
+
         return dataset_path
 
     def fake_rebuild_vector_index(dataset_path=None, max_events=None):
+        """Remplace la reconstruction FAISS pendant le test API."""
+
         return RebuildIndexResult(
             dataset_path=str(dataset_path),
             vector_store_dir=str(tmp_path / "vector_store"),
@@ -141,7 +247,7 @@ def test_rebuild_endpoint_runs_pipeline(monkeypatch, tmp_path) -> None:
 
 
 def test_rebuild_endpoint_can_require_token(monkeypatch) -> None:
-    """Verifie la protection optionnelle du rebuild."""
+    """Vérifie la protection optionnelle du rebuild."""
 
     monkeypatch.setattr(routes.settings, "api_rebuild_token", "secret")
     client = TestClient(app)

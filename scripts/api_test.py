@@ -11,7 +11,7 @@ import requests
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 DEMO_QUESTION = os.getenv(
     "DEMO_QUESTION",
-    "Je cherche un concert de Gospel Jazz pour la Fete de la musique a Paris, "
+    "Je cherche un concert de Gospel Jazz pour la Fête de la musique à Paris, "
     "que peux-tu me proposer ?",
 )
 
@@ -29,7 +29,6 @@ def main() -> None:
             "question": DEMO_QUESTION,
             "top_k": 3,
             "retrieval_max_score": 0.45,
-            "retrieval_candidate_multiplier": 8,
             "temperature": 0.2,
             "max_tokens": 600,
         },
@@ -40,7 +39,7 @@ def main() -> None:
 
 
 def print_json(label: str, payload: dict) -> None:
-    """Affiche une reponse JSON de facon compatible avec les consoles Windows."""
+    """Affiche une réponse JSON de façon compatible avec les consoles Windows."""
 
     print(f"{label}: {json.dumps(payload, ensure_ascii=True, indent=2)}")
 

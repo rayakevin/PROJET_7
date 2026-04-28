@@ -1,17 +1,19 @@
-# Demo Docker - POC RAG Puls-Events
+# Démo Docker - POC RAG Puls-Events
 
 ## Objectif
 
-Montrer en soutenance que le chatbot RAG est executable localement dans un
-conteneur Docker et requetable via une API REST FastAPI.
+Montrer en soutenance que le chatbot RAG est exécutable localement dans un
+conteneur Docker et requêtable via une API REST FastAPI.
 
-## Prerequis
+## Prérequis
 
-- Docker Desktop lance, avec le moteur Linux disponible.
-- Fichier `.env` present a la racine avec `MISTRAL_API_KEY`.
-- Index vectoriel deja construit dans `data/vector_store`.
+- Docker Desktop lancé, avec le moteur Linux disponible.
+- Fichier `.env` présent à la racine avec `MISTRAL_API_KEY`.
+- Index vectoriel déjà construit dans `data/vector_store`.
+- Docker Compose monte le dossier local `./data` dans `/app/data`.
+- Ollama lancé sur la machine hôte si le mode local ou fallback est utilisé.
 
-Verifier les artefacts locaux :
+Vérifier les artefacts locaux :
 
 ```powershell
 Test-Path data\vector_store\index.faiss
@@ -39,18 +41,38 @@ Lancement de l'interface Streamlit :
 http://127.0.0.1:8501
 ```
 
-L'interface permet de regler la temperature, le nombre de sources, la distance
-FAISS maximale, le nombre de candidats avant reranking et la longueur maximale
-de generation. La distance FAISS n'est pas un score de similarite : plus elle
-est basse, plus le chunk est proche de la question.
+L'interface permet de régler la température, le nombre de sources, la distance
+FAISS maximale, la longueur maximale de génération et le fournisseur LLM
+(`mistral`, `ollama` ou `auto`). La distance FAISS n'est pas un score de
+similarité : plus elle est basse, plus le chunk est proche de la question.
 
 Ou sans Compose :
 
 ```powershell
-docker run --rm --env-file .env -p 8000:8000 projet7-rag-api
+docker run --rm --env-file .env -p 8000:8000 -v "${PWD}/data:/app/data" projet7-rag-api
 ```
 
-## Verification rapide
+Pour tester le fallback local avec Docker Compose, vérifier qu'Ollama répond
+sur la machine hôte :
+
+```powershell
+ollama list
+ollama pull qwen3:30b
+```
+
+Puis ajouter dans `.env` :
+
+```text
+LLM_PROVIDER=auto
+OLLAMA_CHAT_MODEL=qwen3:30b
+OLLAMA_MIN_TOKENS=1200
+```
+
+Dans Docker Compose, `OLLAMA_BASE_URL` pointe vers
+`http://host.docker.internal:11434` pour que le conteneur contacte Ollama sur
+Windows.
+
+## Vérification rapide
 
 Swagger :
 
@@ -71,42 +93,42 @@ $env:API_BASE_URL="http://127.0.0.1:8000"
 python scripts/api_test.py
 ```
 
-## Scenarios de demo
+## Scénarios de démo
 
 ### 1. Concert cible
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/ask `
   -H "Content-Type: application/json" `
-  -d "{\"question\":\"Je cherche un concert de Gospel Jazz pour la Fete de la musique a Paris, que peux-tu me proposer ?\"}"
+  -d "{\"question\":\"Je cherche un concert de Gospel Jazz pour la Fête de la musique à Paris, que peux-tu me proposer ?\"}"
 ```
 
 Attendu : proposition du Concert de Gospel Jazz au 132 avenue de Versailles,
 avec date et source.
 
-### 2. Activite cosplay
+### 2. Activité cosplay
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/ask `
   -H "Content-Type: application/json" `
-  -d "{\"question\":\"Je veux faire une activite cosplay a la Cite des sciences et de l'Industrie, quels evenements existent ?\"}"
+  -d "{\"question\":\"Je veux faire une activité cosplay à la Cité des sciences et de l'Industrie, quels événements existent ?\"}"
 ```
 
-Attendu : recommandations Cosplaymania, concours/defile ou atelier associe.
+Attendu : recommandations Cosplaymania, concours/défilé ou atelier associé.
 
 ### 3. Jeune public
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/ask `
   -H "Content-Type: application/json" `
-  -d "{\"question\":\"Je cherche un spectacle jeune public des 3 ans a Paris, as-tu une recommandation ?\"}"
+  -d "{\"question\":\"Je cherche un spectacle jeune public dès 3 ans à Paris, as-tu une recommandation ?\"}"
 ```
 
 Attendu : recommandation d'un spectacle jeune public avec lieu, date et sources.
 
 ## Reconstruction de l'index
 
-Hors demo live, l'index peut etre reconstruit avec :
+Hors démo live, l'index peut être reconstruit avec :
 
 ```powershell
 python scripts/rebuild_index.py --index
@@ -118,6 +140,7 @@ Dans le conteneur :
 docker compose exec rag-api python scripts/rebuild_index.py --index
 ```
 
-Cette operation depend de l'API Mistral et peut prendre plusieurs minutes sur
-le dataset complet. Pour la soutenance, utiliser l'index deja embarque dans
-l'image afin de garder une demo fluide.
+Cette opération dépend de l'API Mistral et peut prendre plusieurs minutes sur
+le dataset complet. Pour la soutenance, utiliser l'index local déjà présent
+dans `data/vector_store` et monté dans le conteneur afin de garder une démo
+fluide.

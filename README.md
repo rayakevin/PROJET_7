@@ -1,15 +1,15 @@
 # Projet 7 - POC RAG culturel
 
-POC de chatbot de recommandation culturelle base sur le dataset public
-`evenements-publics-openagenda` expose par OpenDataSoft.
+POC de chatbot de recommandation culturelle basé sur le dataset public
+`evenements-publics-openagenda` exposé par OpenDataSoft.
 
 ```text
 OpenDataSoft -> ingestion -> dataset -> chunks -> embeddings -> vector store -> API
                             \_______________________________________________/
-                                         evaluation + tests
+                                         évaluation + tests
 ```
 
-## Source de donnees
+## Source de données
 
 Source unique du projet :
 
@@ -17,9 +17,9 @@ Source unique du projet :
 https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/evenements-publics-openagenda/records
 ```
 
-Le projet n'utilise pas l'API OpenAgenda directe et ne necessite pas de cle
-OpenAgenda. Les filtres principaux sont appliques via les parametres
-OpenDataSoft : ville, periode, recherche texte et mots-cles.
+Le projet n'utilise pas l'API OpenAgenda directe et ne nécessite pas de clé
+OpenAgenda. Les filtres principaux sont appliqués via les paramètres
+OpenDataSoft : ville, période, recherche texte et mots-clés.
 
 ## Arborescence
 
@@ -28,14 +28,169 @@ app/
 |-- clients/          # client OpenDataSoft
 |-- ingestion/        # collecte, normalisation, dataset
 |-- rag/              # chunking, embeddings, vector store, retrieval
-|-- services/         # orchestration metier
-|-- api/              # routes et schemas FastAPI
+|-- services/         # orchestration métier
+|-- api/              # routes et schémas FastAPI
 `-- config.py         # variables d'environnement
 scripts/              # commandes locales
-tests/                # unitaires, integration, fixtures
-data/                 # donnees et artefacts locaux ignores par Git
+tests/                # unitaires, intégration, fixtures
+data/                 # données et artefacts locaux ignorés par Git
 docs/                 # rapport technique et soutenance
 ```
+
+## Rapport technique synthétique
+
+### Architecture UML
+
+```mermaid
+flowchart LR
+    user[Utilisateur / équipe métier] --> ui[UI Streamlit]
+    user --> api[API FastAPI]
+    ui --> api
+    api --> qa[QAService]
+    qa --> retriever[EventRetriever]
+    retriever --> faiss[(Index FAISS)]
+    faiss --> chunks[(chunks + métadonnées)]
+    retriever --> embeddings[Embeddings Mistral ou Ollama]
+    qa --> prompt[Prompt RAG LangChain]
+    prompt --> llm[Mistral chat ou Ollama local]
+    llm --> api
+
+    ods[OpenDataSoft OpenAgenda] --> fetch[fetch_events]
+    fetch --> raw[(events_raw.json)]
+    raw --> normalize[normalisation + qualité]
+    normalize --> processed[(events_processed.json)]
+    processed --> chunking[chunking full_text]
+    chunking --> embeddings
+    embeddings --> faiss
+
+    qa_dataset[jeu de test annoté] --> eval[evaluate_rag.py]
+    api --> eval
+    eval --> ragas[Ragas]
+```
+
+### Composants
+
+- `OpenDataSoftEventsClient` récupère les événements publics avec pagination,
+  filtres de ville, période, recherche texte et mots-clés.
+- `normalize_events` nettoie les champs utiles, enlève le HTML et construit
+  `full_text`, le texte documentaire indexé ensuite.
+- `assess_events_quality` produit un rapport qualité : complétude des champs,
+  longueur de `full_text`, doublons et événements indexables.
+- `chunk_events` découpe `full_text` en morceaux avec chevauchement pour limiter
+  la perte d'information au moment de l'indexation.
+- `MistralEmbeddingModel` transforme les chunks et les questions en vecteurs
+  sémantiques avec `mistral-embed`. `OllamaEmbeddingModel` permet une
+  alternative locale si l'index est reconstruit avec le même fournisseur.
+- `FaissVectorStore` stocke les vecteurs dans FAISS via LangChain, conserve les
+  métadonnées et complète la recherche vectorielle par un reranking lexical
+  simple sur les titres, lieux, mots-clés et textes.
+- `MistralAnswerGenerator` construit le prompt RAG et génère une réponse avec
+  `mistral-small-latest`. `OllamaAnswerGenerator` permet de générer localement
+  après le retrieval, et le mode `auto` bascule sur Ollama si Mistral échoue.
+- `QAService` orchestre explicitement la chaîne : question, retrieval, contexte,
+  génération, réponse JSON avec sources.
+- `FastAPI` expose `/health`, `/metadata`, `/ask` et `/rebuild`.
+- `evaluate_rag.py` compare les réponses générées au jeu annoté avec Ragas.
+- `Dockerfile` et `docker-compose.yml` rendent la démonstration locale
+  reproductible avec l'API et l'interface Streamlit.
+
+### Choix technologiques et modèles
+
+- `FastAPI` est utilisé pour obtenir une API REST simple, typée et documentée
+  automatiquement avec Swagger.
+- `LangChain` fournit l'intégration FAISS et la structuration du prompt RAG.
+- `FAISS` permet une recherche vectorielle locale rapide et portable avec
+  `faiss-cpu`.
+- `Mistral` est utilisé pour les embeddings (`mistral-embed`) et la génération
+  de réponse (`mistral-small-latest`).
+- `Ollama` est disponible comme fallback local pour la génération, ou comme
+  fournisseur local complet si l'on reconstruit l'index avec un modèle
+  d'embeddings Ollama.
+- `Ragas` automatise les métriques d'évaluation attendues par la grille.
+
+### Paramétrage métier
+
+Le POC cible par défaut Paris, avec un historique de 365 jours et une fenêtre
+future de 90 jours. Ces valeurs par défaut sont définies dans `app/config.py`.
+Le fichier `.env` sert surtout à renseigner les secrets, par exemple
+`MISTRAL_API_KEY`, ou à surcharger ponctuellement une valeur sans modifier le
+code.
+
+Les paramètres modifiables à l'exécution dans `/ask` et dans l'interface
+Streamlit sont `top_k`, `retrieval_max_score`, `temperature`, `max_tokens`,
+`llm_provider` et `llm_model`. Ils ne modifient pas le `.env` : ils
+s'appliquent seulement à la requête envoyée.
+
+Les paramètres qui changent la construction de l'index, comme `CHUNK_SIZE`,
+`CHUNK_OVERLAP`, `MISTRAL_EMBEDDING_MODEL`, `EMBEDDING_PROVIDER`,
+`OLLAMA_EMBEDDING_MODEL` ou la source de données, nécessitent de reconstruire
+l'index.
+
+### Mode local Ollama
+
+La génération après retrieval peut tourner sans API Mistral avec Ollama :
+
+```bash
+ollama serve
+ollama pull qwen3:30b
+```
+
+Puis utiliser l'un des modes suivants :
+
+```bash
+# Génération locale uniquement, en gardant l'index Mistral existant.
+LLM_PROVIDER=ollama
+OLLAMA_CHAT_MODEL=qwen3:30b
+
+# Fallback : Mistral est tenté en premier, puis Ollama prend le relais.
+LLM_PROVIDER=auto
+OLLAMA_CHAT_MODEL=qwen3:30b
+```
+
+Attention : avec l'index actuel construit en `mistral-embed`, le retrieval
+continue à utiliser les embeddings Mistral pour vectoriser la question. Pour
+supprimer aussi cette dépendance, il faut reconstruire l'index avec un modèle
+d'embeddings Ollama :
+
+```bash
+ollama pull nomic-embed-text
+EMBEDDING_PROVIDER=ollama
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+python scripts/rebuild_index.py --index
+```
+
+Le fournisseur d'embeddings utilisé à la requête doit rester cohérent avec le
+fournisseur utilisé lors de la construction de l'index, sinon les dimensions et
+la géométrie des vecteurs ne correspondent plus.
+
+Le prompt système impose de répondre uniquement à partir du contexte fourni, de
+signaler les limites du contexte, et de citer des événements concrets avec
+titre, lieu et date lorsque ces informations sont disponibles.
+
+### Résultats observés
+
+Dernière évaluation Ragas observée sur 5 questions annotées :
+
+- `faithfulness` : 0.9464, les réponses restent majoritairement fidèles aux
+  sources récupérées.
+- `answer_relevance` : 0.8618, les réponses sont pertinentes par rapport aux
+  questions de test.
+- `context_precision` : 1.0000, les contextes récupérés sont globalement utiles,
+  avec une marge d'amélioration sur le classement des sources.
+- `semantic_similarity` : 0.9522, les réponses générées restent proches des
+  réponses de référence.
+
+### Limites et pistes d'amélioration
+
+- Ajouter des filtres temporels explicites dans `/ask` pour mieux répondre aux
+  questions du type "ce week-end" ou "la semaine prochaine".
+- Étendre le jeu de test annoté à davantage de catégories culturelles et de
+  villes.
+- Ajouter une évaluation régulière dans une CI complète avec seuils minimums.
+- Tester plusieurs stratégies de reranking ou un reranker dédié si le volume de
+  données augmente.
+- Prévoir une authentification plus complète si `/rebuild` était exposé hors
+  environnement local.
 
 ## Mise en route
 
@@ -46,9 +201,17 @@ python scripts/check_environment.py
 pytest
 ```
 
+Dans `.env`, la seule valeur obligatoire pour utiliser Mistral est :
+
+```text
+MISTRAL_API_KEY=...
+```
+
+Les autres valeurs sont déjà définies par défaut dans `app/config.py`.
+
 ## Ingestion
 
-Construire le dataset brut puis normalise :
+Construire le dataset brut puis normalisé :
 
 ```bash
 python scripts/rebuild_index.py --fetch
@@ -60,7 +223,7 @@ Exemple avec une ville explicite :
 python scripts/rebuild_index.py --fetch --city Paris
 ```
 
-Sorties par defaut :
+Sorties par défaut :
 
 - `data/raw/events_raw.json`
 - `data/processed/events_processed.json`
@@ -68,28 +231,29 @@ Sorties par defaut :
 
 ## Indexation RAG
 
-Le dataset normalise est decoupe en chunks a partir du champ `full_text`, puis
-les chunks sont vectorises avec Mistral et sauvegardes dans un index FAISS.
+Le dataset normalisé est découpé en chunks à partir du champ `full_text`, puis
+les chunks sont vectorisés avec le fournisseur d'embeddings configuré
+(`mistral` par défaut) et sauvegardés dans un index FAISS.
 
-Construire uniquement l'index a partir du dataset deja present :
+Construire uniquement l'index à partir du dataset déjà présent :
 
 ```bash
 python scripts/rebuild_index.py --index
 ```
 
-Faire un test limite pour eviter de vectoriser tout le dataset :
+Faire un test limité pour éviter de vectoriser tout le dataset :
 
 ```bash
 python scripts/rebuild_index.py --index --max-events 20
 ```
 
-Reconstruire toute la chaine ingestion + dataset + index :
+Reconstruire toute la chaîne ingestion + dataset + index :
 
 ```bash
 python scripts/rebuild_index.py --fetch --index --city Paris
 ```
 
-Sorties FAISS par defaut :
+Sorties FAISS par défaut :
 
 - `data/vector_store/index.faiss`
 - `data/vector_store/index.pkl`
@@ -97,21 +261,22 @@ Sorties FAISS par defaut :
 
 ## Chatbot RAG
 
-Le service de question-reponse charge l'index FAISS, recupere les chunks les
-plus proches avec LangChain, construit un prompt contextualise, puis genere une
-reponse naturelle avec Mistral.
+Le service de question-réponse charge l'index FAISS, récupère les chunks les
+plus proches avec LangChain, construit un prompt contextualisé, puis génère une
+réponse naturelle avec Mistral ou Ollama selon `LLM_PROVIDER`.
 
 Exemple Python local :
 
 ```bash
-python -c "from app.services.qa_service import QAService; r=QAService().ask('Quels concerts de jazz sont disponibles a Paris ?'); print(r.to_dict())"
+python -c "from app.services.qa_service import QAService; r=QAService().ask('Quels concerts de jazz sont disponibles à Paris ?'); print(r.to_dict())"
 ```
 
-La reponse contient :
+La réponse contient :
 
 - `question` : question utilisateur ;
-- `answer` : reponse generee par Mistral ;
-- `sources` : chunks/evenements utilises avec titre, lieu, dates et score.
+- `answer` : réponse générée par le fournisseur LLM configuré ;
+- `sources` : chunks/événements utilisés avec titre, lieu, dates et distance
+  FAISS (`score`, plus bas = plus proche).
 
 ## API REST
 
@@ -121,7 +286,7 @@ Lancer l'API localement :
 python scripts/run_api.py
 ```
 
-Swagger est disponible a l'adresse :
+Swagger est disponible à l'adresse :
 
 ```text
 http://127.0.0.1:8000/docs
@@ -129,19 +294,39 @@ http://127.0.0.1:8000/docs
 
 Endpoints principaux :
 
-- `GET /health` : etat de l'API et presence de l'index local ;
+- `GET /health` : état de l'API et présence de l'index local ;
+- `GET /metadata` : configuration publique du POC, sans secret ;
 - `POST /ask` : question utilisateur vers le chatbot RAG ;
 - `POST /rebuild` : reconstruction du dataset et de l'index FAISS.
+
+### Gestion des codes HTTP
+
+| Code | Cas couvert | Exemple |
+|---|---|---|
+| `200` | Requête valide | `/health`, `/metadata`, `/ask`, `/rebuild` |
+| `403` | Accès refusé à une route sensible | Token `X-Rebuild-Token` absent ou invalide sur `/rebuild` |
+| `422` | Corps de requête invalide | Question vide, `top_k=0`, `temperature` hors plage, fournisseur LLM inconnu |
+| `503` | Service temporairement indisponible | Index FAISS absent, erreur Mistral/Ollama, erreur de rebuild |
+
+FastAPI et Pydantic valident automatiquement les types et les bornes des
+paramètres. Les erreurs métier sont converties en réponses JSON explicites pour
+éviter une erreur serveur générique pendant la démonstration.
 
 Exemple `/ask` :
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ask \
   -H "Content-Type: application/json" \
-  -d "{\"question\":\"Quels concerts de jazz sont disponibles a Paris ?\"}"
+  -d "{\"question\":\"Quels concerts de jazz sont disponibles à Paris ?\"}"
 ```
 
-Exemple `/rebuild` limite a 20 evenements pour un test rapide :
+Exemple `/metadata` :
+
+```bash
+curl http://127.0.0.1:8000/metadata
+```
+
+Exemple `/rebuild` limité à 20 événements pour un test rapide :
 
 ```bash
 curl -X POST http://127.0.0.1:8000/rebuild \
@@ -149,7 +334,7 @@ curl -X POST http://127.0.0.1:8000/rebuild \
   -d "{\"fetch\":false,\"max_events\":20}"
 ```
 
-Si `API_REBUILD_TOKEN` est renseigne, `/rebuild` exige l'en-tete
+Si `API_REBUILD_TOKEN` est renseigné, `/rebuild` exige l'en-tête
 `X-Rebuild-Token`.
 
 Test fonctionnel manuel :
@@ -160,9 +345,11 @@ python scripts/api_test.py
 
 ## Docker
 
-L'image Docker embarque l'API et les artefacts locaux presents dans `data/`.
-Docker Desktop doit etre lance avant le build.
-Pour une demo fluide, construire l'index avant le build :
+L'image Docker embarque le code de l'API. Les artefacts locaux du dossier
+`data/` sont montés dans le conteneur par Docker Compose, ce qui évite de
+copier des fichiers volumineux dans l'image.
+Docker Desktop doit être lancé avant le build.
+Pour une démo fluide, construire l'index avant le lancement :
 
 ```bash
 python scripts/rebuild_index.py --index
@@ -172,7 +359,7 @@ Construire puis lancer l'API :
 
 ```bash
 docker build -t projet7-rag-api .
-docker run --rm --env-file .env -p 8000:8000 projet7-rag-api
+docker run --rm --env-file .env -p 8000:8000 -v "${PWD}/data:/app/data" projet7-rag-api
 ```
 
 Avec Docker Compose :
@@ -186,25 +373,24 @@ Interfaces disponibles :
 - API Swagger : `http://127.0.0.1:8000/docs`
 - UI Streamlit : `http://127.0.0.1:8501`
 
-Verification :
+Vérification :
 
 ```bash
 curl http://127.0.0.1:8000/health
 python scripts/api_test.py
 ```
 
-Le guide de demo est disponible dans `docs/soutenance/demo_docker.md`.
+Le guide de démo est disponible dans `docs/soutenance/demo_docker.md`.
 
 ## Interface Streamlit
 
-Une interface locale permet d'interroger l'API avec des controles sur les
-principaux hyperparametres :
+Une interface locale permet d'interroger l'API avec des contrôles sur les
+principaux hyperparamètres :
 
-- temperature du LLM ;
+- température du LLM ;
 - nombre de sources `top_k` ;
 - distance FAISS maximale, plus basse signifie plus proche de la question ;
-- nombre de candidats avant reranking ;
-- longueur maximale de reponse.
+- longueur maximale de réponse.
 
 Lancer l'API puis l'interface en local :
 
@@ -219,82 +405,98 @@ Ou lancer les deux via Docker Compose :
 docker compose up --build
 ```
 
-## Evaluation
+## Évaluation
 
-Le jeu de test annote se trouve dans `tests/fixtures/qa_dataset.json`.
-Le script d'evaluation interroge le chatbot, stocke les reponses et calcule :
+Le jeu de test annoté se trouve dans `tests/fixtures/qa_dataset.json`.
+Le script d'évaluation interroge le chatbot, stocke les réponses et calcule :
 
-- metriques locales : nombre de sources et score moyen de retrieval ;
-- metriques Ragas attendues par la grille : `faithfulness`, `answer_relevance`
+- métriques locales : nombre de sources et distance FAISS moyenne ;
+- métriques Ragas attendues par la grille : `faithfulness`, `answer_relevance`
   et `context_precision` ;
-- metrique Ragas complementaire : similarite semantique des reponses.
+- métrique Ragas complémentaire : similarité sémantique des réponses.
 
-Lancer l'evaluation complete :
+Lancer l'évaluation complète :
 
 ```bash
 python scripts/evaluate_rag.py
 ```
 
-Lancer uniquement les metriques locales :
+Lancer uniquement les métriques locales :
 
 ```bash
 python scripts/evaluate_rag.py --skip-ragas
 ```
 
-Sorties par defaut :
+Sorties par défaut :
 
 - `data/evaluation/results/rag_evaluation_<timestamp>.json`
 - `data/evaluation/results/rag_evaluation_latest.json`
 
-Le rapport expose les noms internes Ragas et un resume lisible dans
+Le rapport expose les noms internes Ragas et un résumé lisible dans
 `summary.required_ragas_metrics` :
 
 ```json
 {
-  "faithfulness": 0.9417,
-  "answer_relevance": 0.8681,
-  "context_precision": 0.8667
+  "faithfulness": 0.9464,
+  "answer_relevance": 0.8618,
+  "context_precision": 1.0
 }
 ```
 
-Dernier resultat observe sur 5 questions annotees :
+Dernier résultat observé sur 5 questions annotées :
 
 ```text
-Faithfulness: 0.9417
-Answer relevance: 0.8681
-Context precision: 0.8667
-Ragas semantic_similarity: 0.9479
+Faithfulness: 0.9464
+Answer relevance: 0.8618
+Context precision: 1.0
+Ragas semantic_similarity: 0.9522
 Sources moyennes: 3.0
+Distance FAISS moyenne: 0.3858
 ```
 
-## Variables cles
+## Configuration
 
-| Variable | Usage |
+Les valeurs ci-dessous sont définies par défaut dans `app/config.py`. Elles ne
+doivent être ajoutées au `.env` que si l'on veut les surcharger localement.
+
+| Variable | Défaut | Usage |
 |---|---|
-| `MISTRAL_API_KEY` | Embeddings et generation Mistral |
-| `API_REBUILD_TOKEN` | Token optionnel pour proteger `/rebuild` |
-| `MISTRAL_EMBEDDING_MODEL` | Modele d'embeddings, par defaut `mistral-embed` |
-| `MISTRAL_CHAT_MODEL` | Modele de generation, par defaut `mistral-small-latest` |
-| `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | Parametres de generation |
-| `EMBEDDING_BATCH_SIZE` | Taille des lots envoyes a Mistral |
-| `OPENDATASOFT_RECORDS_URL` | Endpoint OpenDataSoft source |
-| `EVENTS_LOCATION` | Ville cible |
-| `EVENTS_LOOKBACK_DAYS` | Historique recupere, en jours |
-| `EVENTS_LOOKAHEAD_DAYS` | Evenements futurs recuperes, en jours |
-| `EVENTS_PAGE_SIZE` | Taille de page OpenDataSoft |
-| `DATA_DIR` | Racine des donnees locales |
-| `VECTOR_STORE_DIR` | Index vectoriel |
-| `TOP_K` | Nombre maximum de chunks retournes, par defaut `3` |
-| `RETRIEVAL_MAX_SCORE` | Distance FAISS maximale conservee, par defaut `0.45` |
-| `RETRIEVAL_CANDIDATE_MULTIPLIER` | Nombre de candidats FAISS avant reranking |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Decoupage documentaire |
+| `MISTRAL_API_KEY` | vide | Secret obligatoire pour les embeddings et la génération Mistral |
+| `API_REBUILD_TOKEN` | vide | Token optionnel pour protéger `/rebuild` |
+| `MISTRAL_EMBEDDING_MODEL` | `mistral-embed` | Modèle d'embeddings |
+| `MISTRAL_CHAT_MODEL` | `mistral-small-latest` | Modèle de génération |
+| `LLM_PROVIDER` | `mistral` | Génération : `mistral`, `ollama` ou `auto` |
+| `EMBEDDING_PROVIDER` | `mistral` | Embeddings : `mistral` ou `ollama` |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Serveur Ollama local |
+| `OLLAMA_CHAT_MODEL` | `qwen3:30b` | Modèle local de génération |
+| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Modèle local d'embeddings |
+| `OLLAMA_MIN_TOKENS` | `1200` | Minimum de génération Ollama, utile pour les modèles reasoning |
+| `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | `0.2` / `600` | Paramètres de génération par défaut |
+| `EMBEDDING_BATCH_SIZE` | `64` | Taille des lots envoyés à Mistral |
+| `OPENDATASOFT_RECORDS_URL` | endpoint public OpenDataSoft | Source de données |
+| `EVENTS_LOCATION` | `Paris` | Ville cible par défaut |
+| `EVENTS_LOOKBACK_DAYS` | `365` | Historique récupéré, en jours |
+| `EVENTS_LOOKAHEAD_DAYS` | `90` | Événements futurs récupérés, en jours |
+| `EVENTS_PAGE_SIZE` | `100` | Taille de page OpenDataSoft |
+| `DATA_DIR` | `data/` | Racine des données locales |
+| `VECTOR_STORE_DIR` | `data/vector_store` | Index vectoriel |
+| `TOP_K` | `3` | Nombre maximum de chunks retournés par défaut |
+| `RETRIEVAL_MAX_SCORE` | `0.45` | Distance FAISS maximale conservée par défaut |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `800` / `100` | Découpage documentaire |
 
-## Stack prevue
+## Stack prévue
 
 `Python 3.11` | `uv` | `FastAPI` | `OpenDataSoft` | `LangChain` |
-`FAISS` | `Mistral` | `Ragas` | `pytest`
+`FAISS` | `Mistral` | `Ollama` | `Ragas` | `pytest`
 
-## Prochaine sequence
+## Livrables
 
-1. Tester le build Docker apres lancement de Docker Desktop.
-2. Finaliser le rapport technique.
+- Rapport technique : `docs/rapport_technique/rapport_technique.md`.
+- README utilisé comme guide de lancement et documentation synthétique.
+- Jeu de test annoté : `tests/fixtures/qa_dataset.json`.
+- Évaluation automatisée : `scripts/evaluate_rag.py`.
+- API REST : `app/api/routes.py`.
+- Démonstration Docker : `Dockerfile`, `docker-compose.yml` et
+  `docs/soutenance/demo_docker.md`.
+- Présentation : `docs/soutenance/presentation_puls_events.pptx` et
+  `docs/soutenance/plan_slides.md`.
