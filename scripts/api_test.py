@@ -25,7 +25,14 @@ def main() -> None:
 
     ask_response = requests.post(
         f"{API_BASE_URL}/ask",
-        json={"question": DEMO_QUESTION},
+        json={
+            "question": DEMO_QUESTION,
+            "top_k": 3,
+            "retrieval_max_score": 0.45,
+            "retrieval_candidate_multiplier": 8,
+            "temperature": 0.2,
+            "max_tokens": 600,
+        },
         timeout=120,
     )
     ask_response.raise_for_status()

@@ -17,7 +17,7 @@ from app.api.schemas import (
 from app.config import settings
 from app.ingestion.build_dataset import build_dataset
 from app.ingestion.fetch_events import fetch_events
-from app.services.qa_service import QAService
+from app.services.qa_service import QAParameters, QAService
 from app.services.rebuild_service import rebuild_vector_index
 
 
@@ -80,7 +80,16 @@ def ask(
     """Genere une reponse augmentee a partir de l'index FAISS."""
 
     try:
-        response = service.ask(request.question)
+        response = service.ask(
+            request.question,
+            parameters=QAParameters(
+                top_k=request.top_k,
+                retrieval_max_score=request.retrieval_max_score,
+                retrieval_candidate_multiplier=request.retrieval_candidate_multiplier,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+            ),
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

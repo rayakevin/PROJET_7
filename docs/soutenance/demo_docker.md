@@ -33,6 +33,17 @@ Avec Docker Compose :
 docker compose up --build
 ```
 
+Lancement de l'interface Streamlit :
+
+```text
+http://127.0.0.1:8501
+```
+
+L'interface permet de regler la temperature, le nombre de sources, la distance
+FAISS maximale, le nombre de candidats avant reranking et la longueur maximale
+de generation. La distance FAISS n'est pas un score de similarite : plus elle
+est basse, plus le chunk est proche de la question.
+
 Ou sans Compose :
 
 ```powershell

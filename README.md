@@ -181,6 +181,11 @@ Avec Docker Compose :
 docker compose up --build
 ```
 
+Interfaces disponibles :
+
+- API Swagger : `http://127.0.0.1:8000/docs`
+- UI Streamlit : `http://127.0.0.1:8501`
+
 Verification :
 
 ```bash
@@ -189,6 +194,30 @@ python scripts/api_test.py
 ```
 
 Le guide de demo est disponible dans `docs/soutenance/demo_docker.md`.
+
+## Interface Streamlit
+
+Une interface locale permet d'interroger l'API avec des controles sur les
+principaux hyperparametres :
+
+- temperature du LLM ;
+- nombre de sources `top_k` ;
+- distance FAISS maximale, plus basse signifie plus proche de la question ;
+- nombre de candidats avant reranking ;
+- longueur maximale de reponse.
+
+Lancer l'API puis l'interface en local :
+
+```bash
+python scripts/run_api.py
+streamlit run ui/streamlit_app.py
+```
+
+Ou lancer les deux via Docker Compose :
+
+```bash
+docker compose up --build
+```
 
 ## Evaluation
 

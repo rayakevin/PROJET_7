@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from langchain_core.runnables import RunnableLambda
@@ -10,6 +10,17 @@ from langchain_core.runnables import RunnableLambda
 from app.rag.answer import AnswerGenerator, MistralAnswerGenerator
 from app.rag.retriever import EventRetriever
 from app.rag.vector_store import SearchResult
+
+
+@dataclass(frozen=True, slots=True)
+class QAParameters:
+    """Parametres configurables pour une question RAG."""
+
+    top_k: int | None = None
+    retrieval_max_score: float | None = None
+    retrieval_candidate_multiplier: int | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +44,7 @@ class QAResponse:
     question: str
     answer: str
     sources: list[AnswerSource]
+    parameters: QAParameters = field(default_factory=QAParameters)
 
     def to_dict(self) -> dict[str, Any]:
         """Convertit la reponse en dictionnaire serialisable."""
@@ -41,6 +53,7 @@ class QAResponse:
             "question": self.question,
             "answer": self.answer,
             "sources": [asdict(source) for source in self.sources],
+            "parameters": asdict(self.parameters),
         }
 
 
@@ -58,31 +71,55 @@ class QAService:
             self._generation_step
         )
 
-    def ask(self, question: str) -> QAResponse:
+    def ask(
+        self,
+        question: str,
+        parameters: QAParameters | None = None,
+    ) -> QAResponse:
         """Pose une question au chatbot RAG."""
 
         cleaned_question = question.strip()
         if not cleaned_question:
             raise ValueError("La question ne peut pas etre vide.")
 
-        return self.chain.invoke(cleaned_question)
+        return self.chain.invoke(
+            {
+                "question": cleaned_question,
+                "parameters": parameters or QAParameters(),
+            }
+        )
 
-    def _retrieve_step(self, question: str) -> dict[str, Any]:
-        contexts = self.retriever.retrieve(question)
+    def _retrieve_step(self, payload: dict[str, Any]) -> dict[str, Any]:
+        question = str(payload["question"])
+        parameters = payload["parameters"]
+        contexts = self.retriever.search(
+            question,
+            top_k=parameters.top_k,
+            max_score=parameters.retrieval_max_score,
+            candidate_multiplier=parameters.retrieval_candidate_multiplier,
+        )
         return {
             "question": question,
             "contexts": contexts,
+            "parameters": parameters,
         }
 
     def _generation_step(self, payload: dict[str, Any]) -> QAResponse:
         question = str(payload["question"])
         contexts = payload["contexts"]
-        answer = self.answer_generator.generate(question, contexts)
+        parameters = payload["parameters"]
+        answer = self.answer_generator.generate(
+            question,
+            contexts,
+            temperature=parameters.temperature,
+            max_tokens=parameters.max_tokens,
+        )
 
         return QAResponse(
             question=question,
             answer=answer,
             sources=build_sources(contexts),
+            parameters=parameters,
         )
 
 
