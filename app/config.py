@@ -93,6 +93,9 @@ class Settings:
 
     mistral_api_key: str = os.getenv("MISTRAL_API_KEY", "")
     mistral_embedding_model: str = os.getenv("MISTRAL_EMBEDDING_MODEL", "mistral-embed")
+    mistral_chat_model: str = os.getenv("MISTRAL_CHAT_MODEL", "mistral-small-latest")
+    llm_temperature: float = _float_env("LLM_TEMPERATURE", 0.2)
+    llm_max_tokens: int = _int_env("LLM_MAX_TOKENS", 600)
     embedding_batch_size: int = _int_env("EMBEDDING_BATCH_SIZE", 64)
     embedding_batch_delay_seconds: float = _float_env(
         "EMBEDDING_BATCH_DELAY_SECONDS", 1.0

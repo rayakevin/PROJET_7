@@ -1,7 +1,43 @@
-"""Composant de retrieval.
+"""Composant de retrieval sur l'index FAISS."""
 
-Ce fichier servira à :
-- transformer la question utilisateur en vecteur ;
-- interroger le vector store ;
-- retourner les chunks les plus pertinents pour la génération.
-"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from app.config import settings
+from app.rag.embeddings import EmbeddingModel, MistralEmbeddingModel
+from app.rag.vector_store import FaissVectorStore, SearchResult
+
+
+class EventRetriever:
+    """Recherche les chunks d'evenements les plus utiles pour une question."""
+
+    def __init__(
+        self,
+        vector_store: FaissVectorStore,
+        top_k: int = settings.top_k,
+    ) -> None:
+        self.vector_store = vector_store
+        self.top_k = top_k
+
+    @classmethod
+    def from_local(
+        cls,
+        vector_store_dir: str | Path = settings.vector_store_dir,
+        embedding_model: EmbeddingModel | None = None,
+        top_k: int = settings.top_k,
+    ) -> "EventRetriever":
+        """Recharge le retriever depuis l'index local."""
+
+        model = embedding_model or MistralEmbeddingModel()
+        vector_store = FaissVectorStore.load(vector_store_dir, model)
+        return cls(vector_store=vector_store, top_k=top_k)
+
+    def retrieve(self, question: str) -> list[SearchResult]:
+        """Retourne les meilleurs chunks pour une question."""
+
+        cleaned_question = question.strip()
+        if not cleaned_question:
+            raise ValueError("La question ne peut pas etre vide.")
+
+        return self.vector_store.search(cleaned_question, top_k=self.top_k)

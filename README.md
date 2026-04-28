@@ -92,7 +92,26 @@ python scripts/rebuild_index.py --fetch --index --city Paris
 Sorties FAISS par defaut :
 
 - `data/vector_store/index.faiss`
+- `data/vector_store/index.pkl`
 - `data/vector_store/chunks.json`
+
+## Chatbot RAG
+
+Le service de question-reponse charge l'index FAISS, recupere les chunks les
+plus proches avec LangChain, construit un prompt contextualise, puis genere une
+reponse naturelle avec Mistral.
+
+Exemple Python local :
+
+```bash
+python -c "from app.services.qa_service import QAService; r=QAService().ask('Quels concerts de jazz sont disponibles a Paris ?'); print(r.to_dict())"
+```
+
+La reponse contient :
+
+- `question` : question utilisateur ;
+- `answer` : reponse generee par Mistral ;
+- `sources` : chunks/evenements utilises avec titre, lieu, dates et score.
 
 ## Variables cles
 
@@ -100,6 +119,8 @@ Sorties FAISS par defaut :
 |---|---|
 | `MISTRAL_API_KEY` | Embeddings et generation Mistral |
 | `MISTRAL_EMBEDDING_MODEL` | Modele d'embeddings, par defaut `mistral-embed` |
+| `MISTRAL_CHAT_MODEL` | Modele de generation, par defaut `mistral-small-latest` |
+| `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | Parametres de generation |
 | `EMBEDDING_BATCH_SIZE` | Taille des lots envoyes a Mistral |
 | `OPENDATASOFT_RECORDS_URL` | Endpoint OpenDataSoft source |
 | `EVENTS_LOCATION` | Ville cible |
@@ -118,7 +139,6 @@ Sorties FAISS par defaut :
 
 ## Prochaine sequence
 
-1. Brancher le retrieval sur l'index FAISS sauvegarde.
-2. Construire la generation de reponse avec Mistral.
-3. Exposer `/ask`, `/rebuild` et `/health` via FastAPI.
-4. Automatiser l'evaluation avec le jeu de test annote.
+1. Exposer `/ask`, `/rebuild` et `/health` via FastAPI.
+2. Automatiser l'evaluation avec le jeu de test annote.
+3. Preparer la demonstration Docker locale.
