@@ -14,7 +14,9 @@ logs
 .env
 .env.*
 !.env.example
-data
+data/*
+!data/vector_store
+!data/vector_store/**
 docs
 tests
 build

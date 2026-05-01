@@ -7,6 +7,7 @@ from typing import Protocol
 
 from langchain_core.prompts import ChatPromptTemplate
 from mistralai import Mistral
+from mistralai.models.sdkerror import SDKError
 import requests
 
 from app.config import settings
@@ -80,15 +81,27 @@ class MistralAnswerGenerator:
             question=question,
             context=format_context(contexts),
         )
-        response = self.client.chat.complete(
-            model=self.model,
-            messages=[
-                {"role": to_mistral_role(message.type), "content": str(message.content)}
-                for message in messages
-            ],
-            temperature=self.temperature if temperature is None else temperature,
-            max_tokens=self.max_tokens if max_tokens is None else max_tokens,
-        )
+        try:
+            response = self.client.chat.complete(
+                model=self.model,
+                messages=[
+                    {
+                        "role": to_mistral_role(message.type),
+                        "content": str(message.content),
+                    }
+                    for message in messages
+                ],
+                temperature=self.temperature if temperature is None else temperature,
+                max_tokens=self.max_tokens if max_tokens is None else max_tokens,
+            )
+        except SDKError as exc:
+            if "Invalid model" in str(exc):
+                raise ValueError(
+                    f"Modèle Mistral invalide : {self.model}. "
+                    "Supprimez le champ llm_model ou choisissez un modèle Mistral valide."
+                ) from exc
+            raise RuntimeError("Échec de génération avec Mistral.") from exc
+
         content = response.choices[0].message.content
         return str(content).strip()
 

@@ -6,6 +6,7 @@ import math
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,12 @@ from langchain_core.embeddings import Embeddings
 from app.config import settings
 from app.rag.chunking import TextChunk
 from app.rag.embeddings import EmbeddingModel
+from app.rag.temporal import (
+    DateFilter,
+    detect_temporal_filter,
+    event_matches_date_filter,
+    event_start_date,
+)
 from app.utils.io import read_json, write_json
 
 
@@ -44,24 +51,42 @@ STOPWORDS = {
     "en",
     "et",
     "evenements",
+    "futur",
+    "future",
+    "futures",
+    "futurs",
+    "hui",
+    "jour",
+    "jours",
     "lies",
     "la",
     "le",
     "les",
+    "mois",
     "ou",
     "paris",
     "peut",
     "peuvent",
     "pour",
+    "prochain",
+    "prochaine",
+    "prochainement",
+    "prochaines",
+    "prochains",
     "proposes",
     "prevus",
     "quels",
     "quelles",
+    "semaine",
+    "semaines",
     "sont",
     "sur",
     "trouver",
     "un",
     "une",
+    "venir",
+    "week",
+    "weekend",
 }
 
 
@@ -183,9 +208,15 @@ class FaissVectorStore:
         if top_k <= 0:
             return []
 
+        temporal_filter = detect_temporal_filter(query)
+        search_k = (
+            max(top_k, DEFAULT_LEXICAL_CANDIDATE_LIMIT)
+            if temporal_filter
+            else top_k
+        )
         documents_with_scores = self.store.similarity_search_with_score(
             query,
-            k=top_k,
+            k=search_k,
         )
 
         results: list[SearchResult] = []
@@ -215,6 +246,15 @@ class FaissVectorStore:
         )
         results = rerank_results(query_tokens, token_weights, results)
         results = deduplicate_by_event(results)
+
+        if temporal_filter:
+            results = filter_temporal_results(
+                results=results,
+                temporal_filter=temporal_filter,
+                query_tokens=query_tokens,
+                token_weights=token_weights,
+                chunks=self.chunks,
+            )
 
         if max_score is None:
             return results[:top_k]
@@ -304,6 +344,63 @@ def deduplicate_by_event(results: list[SearchResult]) -> list[SearchResult]:
         deduplicated.append(result)
         seen_events.add(event_uid)
     return deduplicated
+
+
+def filter_temporal_results(
+    results: list[SearchResult],
+    temporal_filter: DateFilter,
+    query_tokens: list[str],
+    token_weights: dict[str, float],
+    chunks: list[TextChunk],
+) -> list[SearchResult]:
+    """Garde les événements compatibles avec la période demandée.
+
+    Si les candidats FAISS ne suffisent pas, on complète avec les chunks locaux
+    dont les métadonnées de dates correspondent. Cette étape reste simple mais
+    évite qu'une question sur le futur retourne un événement passé.
+    """
+
+    temporal_results = [
+        result
+        for result in results
+        if event_matches_date_filter(result.chunk.metadata, temporal_filter)
+        and matches_query_focus(query_tokens, result.chunk)
+    ]
+    seen_chunk_ids = {result.chunk.id for result in temporal_results}
+    fallback_score = (
+        settings.retrieval_max_score
+        if settings.retrieval_max_score is not None
+        else 0.0
+    )
+
+    for chunk in chunks:
+        if chunk.id in seen_chunk_ids:
+            continue
+        if not event_matches_date_filter(chunk.metadata, temporal_filter):
+            continue
+        if not matches_query_focus(query_tokens, chunk):
+            continue
+        temporal_results.append(SearchResult(chunk=chunk, score=fallback_score))
+        seen_chunk_ids.add(chunk.id)
+
+    temporal_results = deduplicate_by_event(temporal_results)
+    return sort_temporal_results(temporal_results, query_tokens, token_weights)
+
+
+def sort_temporal_results(
+    results: list[SearchResult],
+    query_tokens: list[str],
+    token_weights: dict[str, float],
+) -> list[SearchResult]:
+    """Trie les résultats temporels par date proche puis pertinence."""
+
+    return sorted(
+        results,
+        key=lambda result: (
+            event_start_date(result.chunk.metadata) or date.max,
+            -hybrid_rank_score(query_tokens, token_weights, result),
+        ),
+    )
 
 
 def hybrid_rank_score(

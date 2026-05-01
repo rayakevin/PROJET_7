@@ -131,6 +131,26 @@ def test_ask_endpoint_accepts_runtime_parameters() -> None:
     )
 
 
+def test_ask_endpoint_ignores_swagger_string_model_placeholder() -> None:
+    """Vérifie que le placeholder Swagger ne remplace pas le modèle configuré."""
+
+    fake_service = FakeQAService()
+    app.dependency_overrides[routes.get_qa_service] = lambda: fake_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Quels concerts jazz ?",
+            "llm_model": "string",
+        },
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert fake_service.last_parameters == QAParameters(llm_model=None)
+
+
 def test_ask_endpoint_rejects_empty_question() -> None:
     """Vérifie la validation des questions vides."""
 

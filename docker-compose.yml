@@ -16,8 +16,6 @@ services:
       VECTOR_STORE_DIR: /app/data/vector_store
       EVALUATION_DATA_DIR: /app/data/evaluation
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-    volumes:
-      - ./data:/app/data
     ports:
       - "8000:8000"
 

@@ -68,6 +68,7 @@ flowchart LR
     faiss --> chunks[(chunks + métadonnées)]
     retriever --> embeddings[Embeddings Mistral ou Ollama]
     qa --> prompt[Prompt RAG LangChain]
+    chunks --> prompt
     prompt --> llm[Mistral chat ou Ollama local]
     llm --> api
 
@@ -226,8 +227,10 @@ Il impose au modèle de :
 - Il dépend de la qualité des sources récupérées.
 - Il ne remplace pas une validation humaine pour les données sensibles ou
   contractuelles.
-- Les questions temporelles fines, par exemple "ce week-end", nécessiteraient
-  des filtres explicites supplémentaires.
+- Les questions temporelles sont gérées par un filtre simple sur les métadonnées
+  `start` et `end` pour les expressions courantes comme "ce week-end" ou
+  "prochaines semaines". Les formulations temporelles plus complexes restent
+  une limite du POC.
 
 ## 5. Construction de la base vectorielle
 
@@ -241,6 +244,12 @@ La construction est faite dans `app/rag/vector_store.py` :
 - association de chaque vecteur à un chunk ;
 - conservation des métadonnées ;
 - sauvegarde locale de l'index.
+
+Au moment du retrieval, un filtre temporel simple est appliqué si la question
+contient une expression comme "ce week-end", "cette semaine", "semaine
+prochaine" ou "prochaines semaines". Ce filtre utilise les métadonnées `start`
+et `end` des événements avant la construction du prompt RAG, afin d'éviter
+d'envoyer au LLM des événements passés lorsqu'une question vise le futur.
 
 ### Stratégie de persistance
 
@@ -363,7 +372,29 @@ L'API gère :
 Limites :
 
 - `/rebuild` est prévu pour un usage local ou protégé ;
-- l'API ne gère pas encore de filtres temporels avancés dans `/ask`.
+- le filtre temporel de `/ask` couvre les expressions courantes, mais pas
+  toutes les formulations calendaires possibles.
+
+### Conteneurisation Docker
+
+Le projet fournit un `Dockerfile` et un `docker-compose.yml` pour lancer l'API et
+l'interface Streamlit localement. L'image Docker embarque le code applicatif et
+l'index FAISS présent dans `data/vector_store` au moment du build. Les données
+brutes et intermédiaires ne sont pas copiées, ce qui garde l'image raisonnable
+tout en rendant la démonstration plus autonome.
+
+La commande principale de démonstration est :
+
+```bash
+docker compose up --build
+```
+
+Pour lancer uniquement l'API :
+
+```bash
+docker build -t projet7-rag-api .
+docker run --rm --env-file .env -p 8000:8000 projet7-rag-api
+```
 
 ## 7. Évaluation du système
 
@@ -456,11 +487,12 @@ Limites observées :
   conservé.
 - Performance variable du mode local selon le modèle Ollama choisi.
 - Pas d'historique conversationnel.
-- Pas encore de filtres temporels fins dans `/ask`.
+- Filtre temporel limité aux expressions courantes dans `/ask`.
 
 ### Améliorations possibles
 
-- Ajouter des paramètres temporels explicites dans `/ask`.
+- Ajouter des paramètres temporels explicites dans `/ask`, par exemple
+  `date_from` et `date_to`, en complément de la détection automatique actuelle.
 - Étendre le dataset à d'autres villes.
 - Augmenter le jeu de test annoté.
 - Ajouter une CI lançant les tests et l'évaluation.

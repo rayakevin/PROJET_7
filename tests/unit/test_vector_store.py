@@ -1,8 +1,12 @@
 """Tests unitaires du filtrage des résultats FAISS."""
 
+from datetime import date
+
 from langchain_core.documents import Document
 
+import app.rag.vector_store as vector_store_module
 from app.rag.chunking import TextChunk
+from app.rag.temporal import DateFilter
 from app.rag.vector_store import (
     FaissVectorStore,
     SearchResult,
@@ -38,6 +42,48 @@ class FakeFaissStore:
                     metadata={"chunk_id": "evt-002::chunk-0", "title": "B"},
                 ),
                 0.5,
+            ),
+        ]
+
+
+class FakeTemporalFaissStore:
+    """Store FAISS de test avec un résultat passé et un résultat futur."""
+
+    def similarity_search_with_score(
+        self,
+        query: str,
+        k: int,
+    ) -> list[tuple[Document, float]]:
+        """Retourne des documents datés pour tester le filtre temporel."""
+
+        assert query == "evenements ce weekend"
+        assert k == 30
+        return [
+            (
+                Document(
+                    page_content="Événement passé",
+                    metadata={
+                        "chunk_id": "evt-past::chunk-0",
+                        "event_uid": "evt-past",
+                        "title": "Concert passé",
+                        "start": "2026-04-20T10:00:00Z",
+                        "end": "2026-04-20T12:00:00Z",
+                    },
+                ),
+                0.1,
+            ),
+            (
+                Document(
+                    page_content="Événement du week-end",
+                    metadata={
+                        "chunk_id": "evt-future::chunk-0",
+                        "event_uid": "evt-future",
+                        "title": "Concert du week-end",
+                        "start": "2026-05-02T10:00:00Z",
+                        "end": "2026-05-02T12:00:00Z",
+                    },
+                ),
+                0.2,
             ),
         ]
 
@@ -95,6 +141,29 @@ def test_search_adds_lexical_candidates_from_metadata() -> None:
     )
 
     assert any(result.chunk.id == "evt-001::chunk-0" for result in results)
+
+
+def test_search_filters_temporal_results(monkeypatch) -> None:
+    """Vérifie qu'une question datée ne retourne pas un événement passé."""
+
+    monkeypatch.setattr(
+        vector_store_module,
+        "detect_temporal_filter",
+        lambda query: DateFilter(
+            start=date(2026, 5, 2),
+            end=date(2026, 5, 3),
+            label="ce week-end",
+        ),
+    )
+    vector_store = FaissVectorStore(store=FakeTemporalFaissStore(), chunks=[])
+
+    results = vector_store.search(
+        "evenements ce weekend",
+        top_k=2,
+        max_score=None,
+    )
+
+    assert [result.chunk.id for result in results] == ["evt-future::chunk-0"]
 
 
 def test_deduplicate_by_event_keeps_first_result() -> None:

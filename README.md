@@ -34,7 +34,7 @@ app/
 scripts/              # commandes locales
 tests/                # unitaires, intégration, fixtures
 data/                 # données et artefacts locaux ignorés par Git
-docs/                 # rapport technique et soutenance
+docs/                 # rapport technique
 ```
 
 ## Rapport technique synthétique
@@ -52,6 +52,7 @@ flowchart LR
     faiss --> chunks[(chunks + métadonnées)]
     retriever --> embeddings[Embeddings Mistral ou Ollama]
     qa --> prompt[Prompt RAG LangChain]
+    chunks --> prompt
     prompt --> llm[Mistral chat ou Ollama local]
     llm --> api
 
@@ -83,7 +84,9 @@ flowchart LR
   alternative locale si l'index est reconstruit avec le même fournisseur.
 - `FaissVectorStore` stocke les vecteurs dans FAISS via LangChain, conserve les
   métadonnées et complète la recherche vectorielle par un reranking lexical
-  simple sur les titres, lieux, mots-clés et textes.
+  simple sur les titres, lieux, mots-clés et textes. Il applique aussi un
+  filtre temporel quand la question contient une période relative comme
+  "ce week-end", "cette semaine" ou "prochaines semaines".
 - `MistralAnswerGenerator` construit le prompt RAG et génère une réponse avec
   `mistral-small-latest`. `OllamaAnswerGenerator` permet de générer localement
   après le retrieval, et le mode `auto` bascule sur Ollama si Mistral échoue.
@@ -154,9 +157,19 @@ d'embeddings Ollama :
 
 ```bash
 ollama pull nomic-embed-text
+```
+
+Puis ajouter dans `.env` :
+
+```text
 EMBEDDING_PROVIDER=ollama
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-python scripts/rebuild_index.py --index
+```
+
+Et reconstruire l'index :
+
+```bash
+uv run python scripts/rebuild_index.py --index
 ```
 
 Le fournisseur d'embeddings utilisé à la requête doit rester cohérent avec le
@@ -182,8 +195,8 @@ Dernière évaluation Ragas observée sur 5 questions annotées :
 
 ### Limites et pistes d'amélioration
 
-- Ajouter des filtres temporels explicites dans `/ask` pour mieux répondre aux
-  questions du type "ce week-end" ou "la semaine prochaine".
+- Étendre le filtre temporel de `/ask` à davantage de formulations calendaires,
+  par exemple "le premier week-end de juin" ou "pendant les vacances scolaires".
 - Étendre le jeu de test annoté à davantage de catégories culturelles et de
   villes.
 - Ajouter une évaluation régulière dans une CI complète avec seuils minimums.
@@ -192,35 +205,179 @@ Dernière évaluation Ragas observée sur 5 questions annotées :
 - Prévoir une authentification plus complète si `/rebuild` était exposé hors
   environnement local.
 
-## Mise en route
+## Démarrer le projet depuis un clone
+
+Cette section décrit le chemin le plus simple pour lancer le projet sur une
+nouvelle machine après duplication du dépôt.
+
+### 1. Récupérer le dépôt
+
+```bash
+git clone https://github.com/rayakevin/PROJET_7.git
+cd PROJET_7
+```
+
+### 2. Installer l'environnement Python
+
+Le projet cible Python 3.11. La méthode recommandée utilise `uv`, car le dépôt
+contient un `pyproject.toml` et un `uv.lock`.
 
 ```bash
 uv sync --group dev
-cp .env.example .env
-python scripts/check_environment.py
-pytest
 ```
 
-Dans `.env`, la seule valeur obligatoire pour utiliser Mistral est :
+Cette commande crée ou met à jour l'environnement local `.venv` avec les
+dépendances de production et de test.
+
+Si `uv` n'est pas disponible, une installation classique reste possible :
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+### 3. Créer le fichier `.env`
+
+Copier le modèle :
+
+```powershell
+copy .env.example .env
+```
+
+Sous macOS/Linux, utiliser plutôt :
+
+```bash
+cp .env.example .env
+```
+
+Pour utiliser Mistral, la seule valeur obligatoire à renseigner est :
 
 ```text
 MISTRAL_API_KEY=...
 ```
 
-Les autres valeurs sont déjà définies par défaut dans `app/config.py`.
+Aucune clé OpenAgenda/OpenDataSoft n'est nécessaire : la source utilisée est un
+endpoint public. Les autres paramètres ont des valeurs par défaut dans
+`app/config.py` et ne doivent être ajoutés au `.env` que pour les surcharger.
+
+### 4. Vérifier l'installation
+
+```powershell
+uv run python scripts/check_environment.py
+uv run pytest
+```
+
+Avec l'installation classique sans `uv`, utiliser plutôt
+`.\.venv\Scripts\python.exe -m pytest`.
+
+### 5. Préparer les données et l'index FAISS
+
+Si `data/vector_store` contient déjà `index.faiss`, `index.pkl` et
+`chunks.json`, l'API peut démarrer directement.
+
+Sinon, reconstruire l'index :
+
+```powershell
+uv run python scripts/rebuild_index.py --fetch --index --city Paris
+```
+
+Pour un test rapide sans vectoriser tout le dataset :
+
+```powershell
+uv run python scripts/rebuild_index.py --index --max-events 20
+```
+
+### 6. Lancer l'API en local
+
+```powershell
+uv run python scripts/run_api.py
+```
+
+L'API est ensuite disponible ici :
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+La page racine `http://127.0.0.1:8000/` peut retourner `404`, ce n'est pas une
+erreur : les endpoints utiles sont `/docs`, `/health`, `/metadata`, `/ask` et
+`/rebuild`.
+
+Si le port 8000 est déjà utilisé :
+
+```powershell
+$env:APP_PORT="8010"
+uv run python scripts/run_api.py
+```
+
+### 7. Lancer l'interface Streamlit
+
+Dans un deuxième terminal, après avoir lancé l'API :
+
+```powershell
+uv run streamlit run ui/streamlit_app.py
+```
+
+Interface disponible :
+
+```text
+http://127.0.0.1:8501
+```
+
+Streamlit appelle l'API FastAPI et permet de régler les principaux paramètres
+de génération et de retrieval : fournisseur LLM, modèle, température, nombre de
+sources, seuil de distance FAISS et longueur de réponse.
+
+### 8. Choisir le modèle de génération
+
+Par défaut, le projet utilise Mistral :
+
+```text
+LLM_PROVIDER=mistral
+MISTRAL_CHAT_MODEL=mistral-small-latest
+```
+
+Pour générer localement avec Ollama :
+
+```powershell
+ollama serve
+ollama pull qwen2.5:7b
+```
+
+Puis choisir dans `.env`, dans Swagger `/ask` ou dans l'interface Streamlit :
+
+```text
+LLM_PROVIDER=ollama
+OLLAMA_CHAT_MODEL=qwen2.5:7b
+```
+
+Pour un fallback automatique, Mistral est tenté en premier puis Ollama prend le
+relais en cas d'échec :
+
+```text
+LLM_PROVIDER=auto
+OLLAMA_CHAT_MODEL=qwen2.5:7b
+```
+
+Important : le choix du modèle de génération peut se faire à la requête. En
+revanche, le fournisseur d'embeddings doit rester cohérent avec l'index FAISS.
+Si l'index a été construit avec `mistral-embed`, les questions doivent être
+vectorisées avec Mistral. Pour passer les embeddings en local avec Ollama, il
+faut reconstruire l'index.
 
 ## Ingestion
 
 Construire le dataset brut puis normalisé :
 
 ```bash
-python scripts/rebuild_index.py --fetch
+uv run python scripts/rebuild_index.py --fetch
 ```
 
 Exemple avec une ville explicite :
 
 ```bash
-python scripts/rebuild_index.py --fetch --city Paris
+uv run python scripts/rebuild_index.py --fetch --city Paris
 ```
 
 Sorties par défaut :
@@ -238,19 +395,19 @@ les chunks sont vectorisés avec le fournisseur d'embeddings configuré
 Construire uniquement l'index à partir du dataset déjà présent :
 
 ```bash
-python scripts/rebuild_index.py --index
+uv run python scripts/rebuild_index.py --index
 ```
 
 Faire un test limité pour éviter de vectoriser tout le dataset :
 
 ```bash
-python scripts/rebuild_index.py --index --max-events 20
+uv run python scripts/rebuild_index.py --index --max-events 20
 ```
 
 Reconstruire toute la chaîne ingestion + dataset + index :
 
 ```bash
-python scripts/rebuild_index.py --fetch --index --city Paris
+uv run python scripts/rebuild_index.py --fetch --index --city Paris
 ```
 
 Sorties FAISS par défaut :
@@ -268,7 +425,7 @@ réponse naturelle avec Mistral ou Ollama selon `LLM_PROVIDER`.
 Exemple Python local :
 
 ```bash
-python -c "from app.services.qa_service import QAService; r=QAService().ask('Quels concerts de jazz sont disponibles à Paris ?'); print(r.to_dict())"
+uv run python -c "from app.services.qa_service import QAService; r=QAService().ask('Quels concerts de jazz sont disponibles à Paris ?'); print(r.to_dict())"
 ```
 
 La réponse contient :
@@ -283,7 +440,7 @@ La réponse contient :
 Lancer l'API localement :
 
 ```bash
-python scripts/run_api.py
+uv run python scripts/run_api.py
 ```
 
 Swagger est disponible à l'adresse :
@@ -340,26 +497,26 @@ Si `API_REBUILD_TOKEN` est renseigné, `/rebuild` exige l'en-tête
 Test fonctionnel manuel :
 
 ```bash
-python scripts/api_test.py
+uv run python scripts/api_test.py
 ```
 
 ## Docker
 
-L'image Docker embarque le code de l'API. Les artefacts locaux du dossier
-`data/` sont montés dans le conteneur par Docker Compose, ce qui évite de
-copier des fichiers volumineux dans l'image.
+L'image Docker embarque le code de l'API et l'index FAISS présent dans
+`data/vector_store`. Les données brutes et intermédiaires ne sont pas copiées,
+ce qui garde l'image raisonnable tout en permettant une démo autonome.
 Docker Desktop doit être lancé avant le build.
-Pour une démo fluide, construire l'index avant le lancement :
+Pour une démo fluide, construire ou vérifier l'index avant le build :
 
 ```bash
-python scripts/rebuild_index.py --index
+uv run python scripts/rebuild_index.py --index
 ```
 
 Construire puis lancer l'API :
 
 ```bash
 docker build -t projet7-rag-api .
-docker run --rm --env-file .env -p 8000:8000 -v "${PWD}/data:/app/data" projet7-rag-api
+docker run --rm --env-file .env -p 8000:8000 projet7-rag-api
 ```
 
 Avec Docker Compose :
@@ -377,10 +534,8 @@ Vérification :
 
 ```bash
 curl http://127.0.0.1:8000/health
-python scripts/api_test.py
+uv run python scripts/api_test.py
 ```
-
-Le guide de démo est disponible dans `docs/soutenance/demo_docker.md`.
 
 ## Interface Streamlit
 
@@ -392,11 +547,16 @@ principaux hyperparamètres :
 - distance FAISS maximale, plus basse signifie plus proche de la question ;
 - longueur maximale de réponse.
 
-Lancer l'API puis l'interface en local :
+Lancer d'abord l'API dans un premier terminal :
 
-```bash
-python scripts/run_api.py
-streamlit run ui/streamlit_app.py
+```powershell
+uv run python scripts/run_api.py
+```
+
+Puis lancer Streamlit dans un deuxième terminal :
+
+```powershell
+uv run streamlit run ui/streamlit_app.py
 ```
 
 Ou lancer les deux via Docker Compose :
@@ -418,13 +578,13 @@ Le script d'évaluation interroge le chatbot, stocke les réponses et calcule :
 Lancer l'évaluation complète :
 
 ```bash
-python scripts/evaluate_rag.py
+uv run python scripts/evaluate_rag.py
 ```
 
 Lancer uniquement les métriques locales :
 
 ```bash
-python scripts/evaluate_rag.py --skip-ragas
+uv run python scripts/evaluate_rag.py --skip-ragas
 ```
 
 Sorties par défaut :
@@ -460,7 +620,7 @@ Les valeurs ci-dessous sont définies par défaut dans `app/config.py`. Elles ne
 doivent être ajoutées au `.env` que si l'on veut les surcharger localement.
 
 | Variable | Défaut | Usage |
-|---|---|
+|---|---|---|
 | `MISTRAL_API_KEY` | vide | Secret obligatoire pour les embeddings et la génération Mistral |
 | `API_REBUILD_TOKEN` | vide | Token optionnel pour protéger `/rebuild` |
 | `MISTRAL_EMBEDDING_MODEL` | `mistral-embed` | Modèle d'embeddings |
@@ -492,12 +652,10 @@ doivent être ajoutées au `.env` que si l'on veut les surcharger localement.
 
 ## Livrables
 
-- Rapport technique : `docs/rapport_technique/rapport_technique.md`.
+- Rapport technique : `docs/rapport_technique.md`.
 - README utilisé comme guide de lancement et documentation synthétique.
 - Jeu de test annoté : `tests/fixtures/qa_dataset.json`.
 - Évaluation automatisée : `scripts/evaluate_rag.py`.
 - API REST : `app/api/routes.py`.
-- Démonstration Docker : `Dockerfile`, `docker-compose.yml` et
-  `docs/soutenance/demo_docker.md`.
-- Présentation : `docs/soutenance/presentation_puls_events.pptx` et
-  `docs/soutenance/plan_slides.md`.
+- Démonstration Docker : `Dockerfile` et `docker-compose.yml`.
+- Interface locale : `ui/streamlit_app.py`.
