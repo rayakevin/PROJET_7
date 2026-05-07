@@ -4,6 +4,7 @@ from app.rag.chunking import TextChunk
 from app.rag.vector_store import SearchResult
 from scripts.evaluate_rag import (
     EvaluationExample,
+    build_ragas_judge_model,
     build_required_metrics_summary,
     build_report,
     compute_local_metrics,
@@ -110,11 +111,13 @@ def test_build_report_includes_required_ragas_metrics() -> None:
             "faithfulness": 0.8,
             "answer_relevancy": 0.7,
             "llm_context_precision_with_reference": 0.9,
+            "context_recall": 0.85,
         },
         "required_metrics": {
             "faithfulness": 0.8,
             "answer_relevance": 0.7,
             "context_precision": 0.9,
+            "context_recall": 0.85,
         },
         "rows": [],
     }
@@ -125,6 +128,7 @@ def test_build_report_includes_required_ragas_metrics() -> None:
         "faithfulness": 0.8,
         "answer_relevance": 0.7,
         "context_precision": 0.9,
+        "context_recall": 0.85,
     }
 
 
@@ -136,6 +140,7 @@ def test_build_required_metrics_summary_maps_ragas_names() -> None:
             "faithfulness": 0.1,
             "answer_relevancy": 0.2,
             "llm_context_precision_with_reference": 0.3,
+            "context_recall": 0.4,
         }
     )
 
@@ -143,7 +148,20 @@ def test_build_required_metrics_summary_maps_ragas_names() -> None:
         "faithfulness": 0.1,
         "answer_relevance": 0.2,
         "context_precision": 0.3,
+        "context_recall": 0.4,
     }
+
+
+def test_build_ragas_judge_model_uses_ollama_by_default(monkeypatch) -> None:
+    """Vérifie que le juge Ragas local est le choix par défaut."""
+
+    monkeypatch.setattr("scripts.evaluate_rag.settings.ragas_llm_provider", "ollama")
+    monkeypatch.setattr("scripts.evaluate_rag.settings.ragas_llm_model", "qwen3:30b")
+
+    judge = build_ragas_judge_model()
+
+    assert judge.model == "qwen3:30b"
+    assert judge._llm_type == "ollama-chat"
 
 
 def test_load_examples_reads_fixture(tmp_path) -> None:

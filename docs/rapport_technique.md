@@ -54,7 +54,7 @@ Le POC cherche à démontrer trois points :
 
 ## 2. Architecture du système
 
-### Schéma global
+### Schéma global d'architecture UML simplifié
 
 ```mermaid
 flowchart LR
@@ -93,9 +93,9 @@ flowchart LR
 | Gestion projet | uv, requirements.txt | Reproductibilité de l'environnement |
 | API | FastAPI, Uvicorn | Endpoints REST et Swagger |
 | Données | OpenDataSoft / OpenAgenda | Source d'événements culturels |
-| Vectorisation | Mistral `mistral-embed`, Ollama optionnel | Embeddings des chunks et questions |
-| Base vectorielle | FAISS via LangChain | Recherche vectorielle locale |
-| Génération | Mistral `mistral-small-latest`, Ollama optionnel | Réponse naturelle |
+| Vectorisation | Ollama `nomic-embed-text`, Mistral optionnel | Embeddings des chunks et questions |
+| Base vectorielle | FAISS via LangChain | Deux index locaux : futur et passé |
+| Génération | Ollama `qwen2.5:7b`, Mistral en secours | Réponse naturelle |
 | Orchestration | LangChain | Prompt RAG, intégration FAISS et LLM |
 | Évaluation | Ragas, pytest | Métriques RAG et tests automatisés |
 | Démo | Docker, Docker Compose, Streamlit | Exécution locale et interface de test |
@@ -168,28 +168,27 @@ réponses.
 
 ### Embedding
 
-Le modèle utilisé par défaut est `mistral-embed`.
+Le modèle utilisé par défaut est `nomic-embed-text` via Ollama.
 
 Caractéristiques du POC :
 
-- dimension observée de l'index FAISS local : 1024 ;
+- dimension de l'index dépendante du modèle d'embeddings local utilisé ;
 - vectorisation par lots de 64 textes par défaut ;
 - délai configurable entre les lots ;
-- retries simples en cas de limite de débit Mistral ;
+- exécution locale possible sans appel API externe ;
 - format final : listes de nombres flottants stockées dans FAISS via LangChain.
 
-Une alternative locale existe avec `EMBEDDING_PROVIDER=ollama` et un modèle
-comme `nomic-embed-text`. Dans ce cas, l'index doit être reconstruit, car le
-modèle utilisé pour vectoriser la question doit être le même que celui utilisé
-pour construire les vecteurs FAISS.
+Mistral reste disponible avec `EMBEDDING_PROVIDER=mistral`, mais l'index doit
+alors être reconstruit. Le modèle utilisé pour vectoriser la question doit
+toujours être le même que celui utilisé pour construire les vecteurs FAISS.
 
 ## 4. Choix du modèle NLP
 
 ### Modèles sélectionnés
 
-- Embeddings par défaut : `mistral-embed`.
-- Génération par défaut : `mistral-small-latest`.
-- Génération locale optionnelle : Ollama, par exemple `qwen2.5:7b`.
+- Embeddings par défaut : Ollama `nomic-embed-text`.
+- Génération par défaut : Ollama `qwen2.5:7b`.
+- Secours optionnel : Mistral `mistral-small-latest`.
 
 ### Pourquoi ces modèles ?
 
@@ -200,12 +199,11 @@ Ces modèles répondent bien au cadre du POC :
 - coût plus raisonnable qu'un modèle de génération plus lourd ;
 - API simple à intégrer dans des scripts, tests et endpoints.
 
-Ollama est ajouté comme fournisseur local pour limiter la dépendance à l'API
-Mistral pendant une démonstration. Le mode `LLM_PROVIDER=ollama` force la
-génération locale. Le mode `LLM_PROVIDER=auto` tente Mistral puis bascule vers
-Ollama si l'appel externe échoue. Le modèle local par défaut est `qwen2.5:7b`
-car il est plus léger que `qwen3:30b`, tient beaucoup mieux en VRAM et répond
-plus directement pour une démonstration RAG.
+Ollama est utilisé en priorité pour limiter la dépendance à une API externe
+pendant la démonstration. Le mode `LLM_PROVIDER=auto` tente Ollama en premier,
+puis bascule vers Mistral si la génération locale échoue et si la clé API est
+renseignée. Le modèle local par défaut est `qwen2.5:7b` car il est plus léger
+que `qwen3:30b`, tient mieux en VRAM et répond directement pour une démo RAG.
 
 ### Prompting
 
@@ -214,8 +212,11 @@ Le prompt système utilisé se trouve dans `app/rag/answer.py`.
 Il impose au modèle de :
 
 - répondre comme assistant culturel Puls-Events ;
+- tenir compte de la date du jour injectée dans le prompt ;
 - utiliser uniquement le contexte fourni ;
 - signaler clairement si le contexte ne suffit pas ;
+- ne pas recommander une source passée lorsque la question vise un événement
+  futur ou une prochaine édition ;
 - proposer des événements concrets avec titre, lieu et date ;
 - rester concis, utile et naturel.
 
@@ -229,8 +230,9 @@ Il impose au modèle de :
   contractuelles.
 - Les questions temporelles sont gérées par un filtre simple sur les métadonnées
   `start` et `end` pour les expressions courantes comme "ce week-end" ou
-  "prochaines semaines". Les formulations temporelles plus complexes restent
-  une limite du POC.
+  "prochaines semaines". La "Fête de la musique" est également reconnue et
+  cible le prochain 21 juin si aucune année n'est précisée. Les formulations
+  temporelles plus complexes restent une limite du POC.
 
 ## 5. Construction de la base vectorielle
 
@@ -245,22 +247,34 @@ La construction est faite dans `app/rag/vector_store.py` :
 - conservation des métadonnées ;
 - sauvegarde locale de l'index.
 
-Au moment du retrieval, un filtre temporel simple est appliqué si la question
-contient une expression comme "ce week-end", "cette semaine", "semaine
-prochaine" ou "prochaines semaines". Ce filtre utilise les métadonnées `start`
-et `end` des événements avant la construction du prompt RAG, afin d'éviter
-d'envoyer au LLM des événements passés lorsqu'une question vise le futur.
+Avant la construction FAISS, les événements sont séparés en deux groupes :
+
+- `future` : événements non terminés à la date de reconstruction ;
+- `past` : événements déjà terminés.
+
+Le retriever classe ensuite simplement la question : une formulation passée
+explicite interroge l'index `past`, sinon l'index `future` est utilisé par
+défaut. Cette approche est volontairement lisible pour un POC étudiant.
 
 ### Stratégie de persistance
 
 Les fichiers générés sont :
 
-- `data/vector_store/index.faiss` : index vectoriel FAISS ;
-- `data/vector_store/index.pkl` : structure LangChain associée ;
-- `data/vector_store/chunks.json` : copie lisible des chunks et métadonnées.
+- `data/vector_store/future/index.faiss` : index FAISS des événements futurs ;
+- `data/vector_store/future/index.pkl` : structure LangChain associée ;
+- `data/vector_store/future/chunks.json` : chunks futurs lisibles ;
+- `data/vector_store/past/index.faiss` : index FAISS des événements passés ;
+- `data/vector_store/past/index.pkl` : structure LangChain associée ;
+- `data/vector_store/past/chunks.json` : chunks passés lisibles.
 
 Le chargement de `index.pkl` utilise la désérialisation LangChain. Elle est
 acceptée ici car le fichier est produit localement par les scripts du projet.
+
+Les prompts complets envoyés au modèle sont également sauvegardés localement
+dans `data/prompt_logs/prompt_<timestamp>_<id>.json` à chaque appel LLM. Ces
+fichiers contiennent les messages réellement envoyés au fournisseur, le contexte
+RAG, les sources, le modèle, la température et le nombre maximum de tokens. Ils
+servent à l'audit et au débogage, mais ne sont pas versionnés.
 
 ### Métadonnées associées
 
@@ -297,6 +311,7 @@ Avantages :
 | `/health` | GET | Vérifier l'état de l'API et la présence de l'index |
 | `/metadata` | GET | Exposer la configuration publique sans secret |
 | `/ask` | POST | Poser une question au RAG |
+| `/feedback` | POST | Enregistrer un retour utilisateur sur une réponse |
 | `/rebuild` | POST | Reconstruire le dataset et l'index |
 
 ### Format `/ask`
@@ -319,6 +334,7 @@ Réponse :
 
 ```json
 {
+  "interaction_id": 1,
   "question": "Quels concerts de jazz sont disponibles à Paris ?",
   "answer": "Réponse générée par le fournisseur LLM configuré.",
   "sources": [
@@ -345,6 +361,18 @@ Réponse :
 Le champ `score` correspond à une distance FAISS : plus elle est basse, plus le
 chunk est proche de la question.
 
+Le champ `interaction_id` est enregistré dans une base SQLite locale
+`data/interactions/interactions.db`. Il permet d'envoyer ensuite un feedback via
+`POST /feedback`, par exemple :
+
+```json
+{
+  "interaction_id": 1,
+  "score": "positive",
+  "comment": "Réponse utile pour la démonstration."
+}
+```
+
 ### Exemple d'appel API
 
 ```bash
@@ -367,13 +395,14 @@ L'API gère :
 - les questions vides ;
 - l'absence d'index vectoriel ;
 - les erreurs Mistral ou Ollama ;
+- les feedbacks associés à une interaction absente ;
 - la protection optionnelle de `/rebuild` par token.
 
 Limites :
 
 - `/rebuild` est prévu pour un usage local ou protégé ;
-- le filtre temporel de `/ask` couvre les expressions courantes, mais pas
-  toutes les formulations calendaires possibles.
+- la classification `future` / `past` reste volontairement simple et ne couvre
+  pas toutes les formulations calendaires possibles.
 
 ### Conteneurisation Docker
 
@@ -381,7 +410,9 @@ Le projet fournit un `Dockerfile` et un `docker-compose.yml` pour lancer l'API e
 l'interface Streamlit localement. L'image Docker embarque le code applicatif et
 l'index FAISS présent dans `data/vector_store` au moment du build. Les données
 brutes et intermédiaires ne sont pas copiées, ce qui garde l'image raisonnable
-tout en rendant la démonstration plus autonome.
+tout en rendant la démonstration plus autonome. Docker Compose monte seulement
+`./data/prompt_logs` pour récupérer sur la machine hôte les prompts complets
+générés par l'API.
 
 La commande principale de démonstration est :
 
@@ -424,7 +455,7 @@ Le script `scripts/evaluate_rag.py` calcule :
   - `faithfulness` ;
   - `answer_relevance` ;
   - `context_precision` ;
-  - `semantic_similarity`.
+  - `context_recall`.
 
 ### Résultats obtenus
 
@@ -432,26 +463,31 @@ Dernière évaluation observée :
 
 | Métrique | Score |
 |---|---:|
-| Faithfulness | 0.9464 |
-| Answer relevance | 0.8618 |
-| Context precision | 1.0000 |
-| Semantic similarity | 0.9522 |
-| Sources moyennes | 3.0 |
-| Distance FAISS moyenne | 0.3858 |
+| Faithfulness | 0.9006 |
+| Answer relevance | 0.6224 |
+| Context precision | 0.8750 |
+| Context recall | 0.7917 |
+| Sources moyennes | 2.6250 |
+| Distance FAISS moyenne | 0.3741 |
 
 ### Analyse quantitative
 
 Les scores indiquent que :
 
-- les réponses restent très proches des sources récupérées ;
-- les réponses sont globalement pertinentes par rapport aux questions ;
-- les contextes contenant la réponse attendue sont très bien classés ;
-- la similarité avec les réponses annotées est élevée.
+- les réponses restent majoritairement fidèles aux sources récupérées ;
+- les réponses sont globalement utiles par rapport aux questions, même si la
+  formulation peut encore être rendue plus directe ;
+- les contextes contenant la réponse attendue sont généralement bien classés ;
+- le `context_recall` montre que les contextes récupérés couvrent une partie
+  importante des informations nécessaires, sans tout couvrir parfaitement.
 
-Le `context_precision` à 1.0 doit être interprété avec prudence : Ragas mesure
-la qualité du classement des contextes pertinents. Dans les 5 cas annotés, le
-premier contexte contient la réponse attendue. Cela ne signifie pas que tous les
-contextes sont parfaits, mais que les contextes nécessaires sont bien placés.
+Le `context_precision` doit être interprété avec prudence : Ragas mesure la
+qualité du classement des contextes pertinents. Un score de 0.875 indique que
+les sources utiles sont souvent bien placées, mais qu'il existe encore des cas
+où un contexte moins central remonte avant ou avec le bon contexte. Le
+`context_recall` à 0.7917 complète cette lecture : le retriever retrouve la
+majorité des informations attendues, mais certaines questions ouvertes ne sont
+pas couvertes entièrement.
 
 ### Analyse qualitative
 
@@ -459,8 +495,8 @@ Exemples de bons comportements :
 
 - RED BIRD : le système retrouve l'avant-première exacte au Grand Rex.
 - Cosplay : le système propose plusieurs événements à la Cité des sciences.
-- Art japonais : le système retrouve l'exposition à la Maison de la culture du
-  Japon.
+- Fête de la musique : le système retrouve l'événement musical attendu et son
+  lieu.
 
 Limites observées :
 
@@ -481,7 +517,7 @@ Limites observées :
 
 ### Limites du POC
 
-- Jeu annoté limité à 5 questions.
+- Jeu annoté limité à 8 questions.
 - Périmètre géographique centré sur Paris.
 - Coût et disponibilité liés aux appels Mistral si le mode par défaut est
   conservé.
@@ -513,7 +549,7 @@ app/
 scripts/              # scripts CLI : rebuild, API, évaluation
 tests/                # tests unitaires, intégration, fixtures
 data/                 # données locales utiles au pipeline, ignorées par Git
-docs/                 # rapport technique, autoévaluation, soutenance
+docs/                 # rapport technique et documentation projet
 ui/                   # interface Streamlit
 Dockerfile            # image locale API + UI
 docker-compose.yml    # API FastAPI + Streamlit

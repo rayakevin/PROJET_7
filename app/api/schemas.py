@@ -87,7 +87,7 @@ class AskRequest(BaseModel):
     llm_provider: Literal["mistral", "ollama", "auto"] | None = Field(
         default=None,
         description=(
-            "Fournisseur de génération. 'auto' essaie Mistral puis Ollama."
+            "Fournisseur de génération. 'auto' essaie Ollama puis Mistral."
         ),
     )
     llm_model: str | None = Field(
@@ -139,10 +139,39 @@ class AnswerSourceResponse(BaseModel):
 class AskResponse(BaseModel):
     """Réponse augmentée du chatbot."""
 
+    interaction_id: int | None = Field(
+        default=None,
+        description="Identifiant local de l'interaction, utile pour envoyer un feedback.",
+    )
     question: str
     answer: str
     sources: list[AnswerSourceResponse]
     parameters: dict[str, int | float | str | None]
+
+
+class FeedbackRequest(BaseModel):
+    """Feedback utilisateur sur une interaction enregistrée."""
+
+    interaction_id: int = Field(..., ge=1)
+    score: Literal["positive", "negative"]
+    comment: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("comment")
+    @classmethod
+    def validate_comment(cls, value: str | None) -> str | None:
+        """Nettoie le commentaire optionnel."""
+
+        if value is None:
+            return None
+        cleaned_value = value.strip()
+        return cleaned_value or None
+
+
+class FeedbackResponse(BaseModel):
+    """Réponse après enregistrement d'un feedback."""
+
+    status: str
+    interaction_id: int
 
 
 class RebuildRequest(BaseModel):
@@ -174,6 +203,8 @@ class RebuildResponse(BaseModel):
     vector_store_dir: str
     events_count: int
     chunks_count: int
+    future_events_count: int = 0
+    past_events_count: int = 0
 
 
 class ErrorResponse(BaseModel):

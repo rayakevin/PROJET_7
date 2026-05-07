@@ -1,80 +1,55 @@
-"""Tests unitaires des contraintes temporelles du retrieval."""
+"""Tests unitaires de la séparation passé/futur."""
 
 from datetime import date
 
 from app.rag.temporal import (
-    DateFilter,
-    current_weekend,
-    detect_temporal_filter,
-    event_matches_date_filter,
-    next_week,
+    classify_question_bucket,
+    event_bucket,
+    parse_event_date,
 )
 
 
-def test_detect_temporal_filter_finds_current_weekend() -> None:
-    """Vérifie la détection de l'expression 'ce week-end'."""
+def test_classify_question_bucket_detects_past_question() -> None:
+    """Vérifie qu'une formulation passée utilise l'index passé."""
 
-    date_filter = detect_temporal_filter(
-        "Quels événements à Paris ce week-end ?",
-        today=date(2026, 5, 1),
-    )
-
-    assert date_filter == DateFilter(
-        start=date(2026, 5, 2),
-        end=date(2026, 5, 3),
-        label="ce week-end",
-    )
+    assert classify_question_bucket("Quels événements ont eu lieu en mai ?") == "past"
 
 
-def test_detect_temporal_filter_finds_next_weeks() -> None:
-    """Vérifie la détection des événements des prochaines semaines."""
+def test_classify_question_bucket_detects_future_question() -> None:
+    """Vérifie qu'une formulation future utilise l'index futur."""
 
-    date_filter = detect_temporal_filter(
-        "Donne-moi les événements des prochaines semaines",
-        today=date(2026, 5, 1),
-    )
-
-    assert date_filter == DateFilter(
-        start=date(2026, 5, 1),
-        end=date(2026, 5, 29),
-        label="prochaines semaines",
-    )
+    assert classify_question_bucket("Quels événements sont à venir ?") == "future"
 
 
-def test_event_matches_date_filter_rejects_past_event() -> None:
-    """Vérifie qu'un événement passé ne passe pas un filtre futur."""
+def test_classify_question_bucket_defaults_to_future() -> None:
+    """Vérifie le choix par défaut orienté recommandation."""
 
-    date_filter = DateFilter(
-        start=date(2026, 5, 2),
-        end=date(2026, 5, 3),
-        label="ce week-end",
-    )
-
-    assert not event_matches_date_filter(
-        {"start": "2026-04-20T10:00:00Z", "end": "2026-04-20T12:00:00Z"},
-        date_filter,
-    )
-    assert event_matches_date_filter(
-        {"start": "2026-05-02T10:00:00Z", "end": "2026-05-02T12:00:00Z"},
-        date_filter,
-    )
+    assert classify_question_bucket("Je cherche un concert de jazz") == "future"
 
 
-def test_current_weekend_keeps_sunday_when_already_weekend() -> None:
-    """Vérifie le calcul du week-end quand on est déjà dimanche."""
+def test_event_bucket_uses_end_date() -> None:
+    """Vérifie qu'un événement terminé est classé dans le passé."""
 
-    assert current_weekend(date(2026, 5, 3)) == DateFilter(
-        start=date(2026, 5, 3),
-        end=date(2026, 5, 3),
-        label="ce week-end",
-    )
+    metadata = {
+        "start": "2026-04-01T10:00:00+00:00",
+        "end": "2026-04-01T12:00:00+00:00",
+    }
+
+    assert event_bucket(metadata, today=date(2026, 5, 6)) == "past"
 
 
-def test_next_week_starts_on_next_monday() -> None:
-    """Vérifie que 'semaine prochaine' démarre au lundi suivant."""
+def test_event_bucket_keeps_ongoing_event_in_future() -> None:
+    """Vérifie qu'un événement encore ouvert reste dans l'index futur."""
 
-    assert next_week(date(2026, 5, 1)) == DateFilter(
-        start=date(2026, 5, 4),
-        end=date(2026, 5, 10),
-        label="semaine prochaine",
-    )
+    metadata = {
+        "start": "2025-10-01T10:00:00+00:00",
+        "end": "2026-06-01T12:00:00+00:00",
+    }
+
+    assert event_bucket(metadata, today=date(2026, 5, 6)) == "future"
+
+
+def test_parse_event_date_handles_iso_datetime() -> None:
+    """Vérifie la lecture des dates ISO OpenAgenda."""
+
+    assert parse_event_date("2026-05-06T10:00:00+00:00") == date(2026, 5, 6)

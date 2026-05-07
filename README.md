@@ -79,17 +79,15 @@ flowchart LR
   longueur de `full_text`, doublons et événements indexables.
 - `chunk_events` découpe `full_text` en morceaux avec chevauchement pour limiter
   la perte d'information au moment de l'indexation.
-- `MistralEmbeddingModel` transforme les chunks et les questions en vecteurs
-  sémantiques avec `mistral-embed`. `OllamaEmbeddingModel` permet une
-  alternative locale si l'index est reconstruit avec le même fournisseur.
-- `FaissVectorStore` stocke les vecteurs dans FAISS via LangChain, conserve les
-  métadonnées et complète la recherche vectorielle par un reranking lexical
-  simple sur les titres, lieux, mots-clés et textes. Il applique aussi un
-  filtre temporel quand la question contient une période relative comme
-  "ce week-end", "cette semaine" ou "prochaines semaines".
-- `MistralAnswerGenerator` construit le prompt RAG et génère une réponse avec
-  `mistral-small-latest`. `OllamaAnswerGenerator` permet de générer localement
-  après le retrieval, et le mode `auto` bascule sur Ollama si Mistral échoue.
+- `OllamaEmbeddingModel` transforme les chunks et les questions en vecteurs
+  sémantiques avec `nomic-embed-text`. `MistralEmbeddingModel` reste disponible
+  si l'on veut reconstruire l'index avec `mistral-embed`.
+- `FaissVectorStore` stocke les vecteurs dans FAISS via LangChain. Le projet
+  construit deux index simples : `future` pour les événements à venir et `past`
+  pour les événements terminés.
+- `OllamaAnswerGenerator` construit le prompt RAG et génère localement avec
+  `qwen2.5:7b`. En mode `auto`, Mistral sert seulement de secours si Ollama
+  échoue et si `MISTRAL_API_KEY` est renseignée.
 - `QAService` orchestre explicitement la chaîne : question, retrieval, contexte,
   génération, réponse JSON avec sources.
 - `FastAPI` expose `/health`, `/metadata`, `/ask` et `/rebuild`.
@@ -104,11 +102,10 @@ flowchart LR
 - `LangChain` fournit l'intégration FAISS et la structuration du prompt RAG.
 - `FAISS` permet une recherche vectorielle locale rapide et portable avec
   `faiss-cpu`.
-- `Mistral` est utilisé pour les embeddings (`mistral-embed`) et la génération
-  de réponse (`mistral-small-latest`).
-- `Ollama` est disponible comme fallback local pour la génération, ou comme
-  fournisseur local complet si l'on reconstruit l'index avec un modèle
-  d'embeddings Ollama.
+- `Ollama` est utilisé par défaut pour les embeddings (`nomic-embed-text`) et
+  la génération locale (`qwen2.5:7b`).
+- `Mistral` reste disponible comme fournisseur de secours pour la génération et
+  comme option alternative d'embeddings si l'index est reconstruit avec Mistral.
 - `Ragas` automatise les métriques d'évaluation attendues par la grille.
 
 ### Paramétrage métier
@@ -131,33 +128,36 @@ l'index.
 
 ### Mode local Ollama
 
-La génération après retrieval peut tourner sans API Mistral avec Ollama :
+Le projet est configuré pour tourner localement avec Ollama :
 
 ```bash
 ollama serve
 ollama pull qwen2.5:7b
-```
-
-Puis utiliser l'un des modes suivants :
-
-```bash
-# Génération locale uniquement, en gardant l'index Mistral existant.
-LLM_PROVIDER=ollama
-OLLAMA_CHAT_MODEL=qwen2.5:7b
-
-# Fallback : Mistral est tenté en premier, puis Ollama prend le relais.
-LLM_PROVIDER=auto
-OLLAMA_CHAT_MODEL=qwen2.5:7b
-```
-
-Attention : avec l'index actuel construit en `mistral-embed`, le retrieval
-continue à utiliser les embeddings Mistral pour vectoriser la question. Pour
-supprimer aussi cette dépendance, il faut reconstruire l'index avec un modèle
-d'embeddings Ollama :
-
-```bash
 ollama pull nomic-embed-text
 ```
+
+Configuration par défaut :
+
+```bash
+LLM_PROVIDER=auto
+EMBEDDING_PROVIDER=ollama
+OLLAMA_CHAT_MODEL=qwen2.5:7b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+```
+
+En mode `auto`, Ollama est tenté en premier. Mistral n'est utilisé qu'en secours
+si la génération locale échoue et si `MISTRAL_API_KEY` est renseignée.
+
+Vérifier que les modèles tournent sur GPU :
+
+```bash
+ollama ps
+nvidia-smi
+```
+
+Sur la machine de développement utilisée, `qwen2.5:7b` et `nomic-embed-text`
+sont bien chargés par Ollama avec `PROCESSOR = 100% GPU` sur la RTX PRO 5000
+Blackwell 24 Go.
 
 Puis ajouter dans `.env` :
 
@@ -176,27 +176,30 @@ Le fournisseur d'embeddings utilisé à la requête doit rester cohérent avec l
 fournisseur utilisé lors de la construction de l'index, sinon les dimensions et
 la géométrie des vecteurs ne correspondent plus.
 
-Le prompt système impose de répondre uniquement à partir du contexte fourni, de
-signaler les limites du contexte, et de citer des événements concrets avec
-titre, lieu et date lorsque ces informations sont disponibles.
+Le prompt système injecte la date du jour, impose de répondre uniquement à
+partir du contexte fourni, de signaler les limites du contexte, et de citer des
+événements concrets avec titre, lieu et date lorsque ces informations sont
+disponibles. Il précise aussi qu'une question visant un événement futur ne doit
+pas recommander de source dont la date de fin est antérieure à la date du jour.
 
 ### Résultats observés
 
-Dernière évaluation Ragas observée sur 5 questions annotées :
+Dernière évaluation Ragas observée sur 8 questions annotées, avec Mistral comme
+juge d'évaluation :
 
-- `faithfulness` : 0.9464, les réponses restent majoritairement fidèles aux
-  sources récupérées.
-- `answer_relevance` : 0.8618, les réponses sont pertinentes par rapport aux
-  questions de test.
-- `context_precision` : 1.0000, les contextes récupérés sont globalement utiles,
-  avec une marge d'amélioration sur le classement des sources.
-- `semantic_similarity` : 0.9522, les réponses générées restent proches des
-  réponses de référence.
+- `faithfulness` : 0.9006, les réponses restent majoritairement fidèles aux
+  sources récupérées, avec quelques formulations à surveiller.
+- `answer_relevance` : 0.6224, les réponses restent utiles par rapport aux
+  questions, avec une marge de progression sur la formulation et la concision.
+- `context_precision` : 0.8750, les contextes utiles sont généralement bien
+  classés, mais pas toujours en première position.
+- `context_recall` : 0.7917, les contextes récupérés couvrent une partie
+  importante des informations attendues, sans couvrir tous les cas.
 
 ### Limites et pistes d'amélioration
 
-- Étendre le filtre temporel de `/ask` à davantage de formulations calendaires,
-  par exemple "le premier week-end de juin" ou "pendant les vacances scolaires".
+- Améliorer la classification simple `future` / `past` pour couvrir davantage
+  de formulations calendaires, par exemple "le premier week-end de juin".
 - Étendre le jeu de test annoté à davantage de catégories culturelles et de
   villes.
 - Ajouter une évaluation régulière dans une CI complète avec seuils minimums.
@@ -273,8 +276,8 @@ Avec l'installation classique sans `uv`, utiliser plutôt
 
 ### 5. Préparer les données et l'index FAISS
 
-Si `data/vector_store` contient déjà `index.faiss`, `index.pkl` et
-`chunks.json`, l'API peut démarrer directement.
+Si `data/vector_store/future` et `data/vector_store/past` contiennent chacun
+`index.faiss`, `index.pkl` et `chunks.json`, l'API peut démarrer directement.
 
 Sinon, reconstruire l'index :
 
@@ -331,29 +334,30 @@ sources, seuil de distance FAISS et longueur de réponse.
 
 ### 8. Choisir le modèle de génération
 
-Par défaut, le projet utilise Mistral :
+Par défaut, le projet utilise Ollama en local :
+
+```text
+LLM_PROVIDER=auto
+OLLAMA_CHAT_MODEL=qwen2.5:7b
+```
+
+Préparer les modèles locaux :
+
+```powershell
+ollama serve
+ollama pull qwen2.5:7b
+ollama pull nomic-embed-text
+```
+
+Pour forcer Mistral :
 
 ```text
 LLM_PROVIDER=mistral
 MISTRAL_CHAT_MODEL=mistral-small-latest
 ```
 
-Pour générer localement avec Ollama :
-
-```powershell
-ollama serve
-ollama pull qwen2.5:7b
-```
-
-Puis choisir dans `.env`, dans Swagger `/ask` ou dans l'interface Streamlit :
-
-```text
-LLM_PROVIDER=ollama
-OLLAMA_CHAT_MODEL=qwen2.5:7b
-```
-
-Pour un fallback automatique, Mistral est tenté en premier puis Ollama prend le
-relais en cas d'échec :
+En mode automatique, Ollama est tenté en premier puis Mistral prend le relais
+si Ollama échoue :
 
 ```text
 LLM_PROVIDER=auto
@@ -362,9 +366,8 @@ OLLAMA_CHAT_MODEL=qwen2.5:7b
 
 Important : le choix du modèle de génération peut se faire à la requête. En
 revanche, le fournisseur d'embeddings doit rester cohérent avec l'index FAISS.
-Si l'index a été construit avec `mistral-embed`, les questions doivent être
-vectorisées avec Mistral. Pour passer les embeddings en local avec Ollama, il
-faut reconstruire l'index.
+L'index actuel est construit avec `nomic-embed-text`, donc les questions doivent
+être vectorisées avec Ollama sauf reconstruction complète avec Mistral.
 
 ## Ingestion
 
@@ -412,15 +415,21 @@ uv run python scripts/rebuild_index.py --fetch --index --city Paris
 
 Sorties FAISS par défaut :
 
-- `data/vector_store/index.faiss`
-- `data/vector_store/index.pkl`
-- `data/vector_store/chunks.json`
+- `data/vector_store/future/index.faiss`
+- `data/vector_store/future/index.pkl`
+- `data/vector_store/future/chunks.json`
+- `data/vector_store/past/index.faiss`
+- `data/vector_store/past/index.pkl`
+- `data/vector_store/past/chunks.json`
+- `data/prompt_logs/prompt_<timestamp>_<id>.json` pour chaque prompt complet
+  envoyé au modèle lors d'une question.
 
 ## Chatbot RAG
 
-Le service de question-réponse charge l'index FAISS, récupère les chunks les
+Le service de question-réponse classe d'abord la question en intention
+`future` ou `past`, charge l'index FAISS correspondant, récupère les chunks les
 plus proches avec LangChain, construit un prompt contextualisé, puis génère une
-réponse naturelle avec Mistral ou Ollama selon `LLM_PROVIDER`.
+réponse naturelle avec Ollama ou Mistral selon `LLM_PROVIDER`.
 
 Exemple Python local :
 
@@ -434,6 +443,11 @@ La réponse contient :
 - `answer` : réponse générée par le fournisseur LLM configuré ;
 - `sources` : chunks/événements utilisés avec titre, lieu, dates et distance
   FAISS (`score`, plus bas = plus proche).
+
+À chaque appel au modèle, le prompt complet est sauvegardé localement dans
+`data/prompt_logs`. Le fichier contient les messages envoyés au fournisseur LLM,
+le contexte RAG, les sources utilisées, le modèle, la température et le nombre
+maximum de tokens. Ces fichiers sont ignorés par Git.
 
 ## API REST
 
@@ -454,6 +468,7 @@ Endpoints principaux :
 - `GET /health` : état de l'API et présence de l'index local ;
 - `GET /metadata` : configuration publique du POC, sans secret ;
 - `POST /ask` : question utilisateur vers le chatbot RAG ;
+- `POST /feedback` : retour utilisateur sur une interaction déjà enregistrée ;
 - `POST /rebuild` : reconstruction du dataset et de l'index FAISS.
 
 ### Gestion des codes HTTP
@@ -461,6 +476,7 @@ Endpoints principaux :
 | Code | Cas couvert | Exemple |
 |---|---|---|
 | `200` | Requête valide | `/health`, `/metadata`, `/ask`, `/rebuild` |
+| `404` | Ressource absente | Feedback envoyé sur un `interaction_id` inconnu |
 | `403` | Accès refusé à une route sensible | Token `X-Rebuild-Token` absent ou invalide sur `/rebuild` |
 | `422` | Corps de requête invalide | Question vide, `top_k=0`, `temperature` hors plage, fournisseur LLM inconnu |
 | `503` | Service temporairement indisponible | Index FAISS absent, erreur Mistral/Ollama, erreur de rebuild |
@@ -481,6 +497,14 @@ Exemple `/metadata` :
 
 ```bash
 curl http://127.0.0.1:8000/metadata
+```
+
+Exemple `/feedback` inspiré du cours RAG :
+
+```bash
+curl -X POST http://127.0.0.1:8000/feedback \
+  -H "Content-Type: application/json" \
+  -d "{\"interaction_id\":1,\"score\":\"positive\",\"comment\":\"Réponse utile\"}"
 ```
 
 Exemple `/rebuild` limité à 20 événements pour un test rapide :
@@ -505,6 +529,10 @@ uv run python scripts/api_test.py
 L'image Docker embarque le code de l'API et l'index FAISS présent dans
 `data/vector_store`. Les données brutes et intermédiaires ne sont pas copiées,
 ce qui garde l'image raisonnable tout en permettant une démo autonome.
+Le dossier `data/prompt_logs` reste monté en volume ciblé avec Docker Compose
+pour récupérer localement les prompts complets générés par l'API.
+Les feedbacks utilisateur sont stockés dans `data/interactions/interactions.db`, une base
+SQLite locale ignorée par Git.
 Docker Desktop doit être lancé avant le build.
 Pour une démo fluide, construire ou vérifier l'index avant le build :
 
@@ -545,7 +573,9 @@ principaux hyperparamètres :
 - température du LLM ;
 - nombre de sources `top_k` ;
 - distance FAISS maximale, plus basse signifie plus proche de la question ;
-- longueur maximale de réponse.
+- longueur maximale de réponse ;
+- feedback positif/négatif sur la dernière réponse, enregistré localement dans
+  SQLite.
 
 Lancer d'abord l'API dans un premier terminal :
 
@@ -565,15 +595,28 @@ Ou lancer les deux via Docker Compose :
 docker compose up --build
 ```
 
+## Éléments repris du cours RAG
+
+Le dossier de cours `8532116-mettez-en-place-un-rag-pour-un-llm-main` a servi
+de référence pour trois éléments du POC :
+
+- journaliser les questions, réponses, sources et paramètres dans SQLite ;
+- associer un feedback utilisateur simple à une interaction ;
+- afficher clairement les sources et le score retourné par la recherche
+  vectorielle.
+
+La classification `RAG` / `DIRECT` du cours n'a pas été reprise telle quelle :
+dans cette mission, le comportement attendu est de démontrer un assistant
+événementiel qui interroge systématiquement la base OpenAgenda vectorisée.
+
 ## Évaluation
 
 Le jeu de test annoté se trouve dans `tests/fixtures/qa_dataset.json`.
 Le script d'évaluation interroge le chatbot, stocke les réponses et calcule :
 
 - métriques locales : nombre de sources et distance FAISS moyenne ;
-- métriques Ragas attendues par la grille : `faithfulness`, `answer_relevance`
-  et `context_precision` ;
-- métrique Ragas complémentaire : similarité sémantique des réponses.
+- métriques Ragas attendues par la grille : `faithfulness`, `answer_relevance`,
+  `context_precision` et `context_recall`.
 
 Lancer l'évaluation complète :
 
@@ -597,21 +640,22 @@ Le rapport expose les noms internes Ragas et un résumé lisible dans
 
 ```json
 {
-  "faithfulness": 0.9464,
-  "answer_relevance": 0.8618,
-  "context_precision": 1.0
+  "faithfulness": 0.9006,
+  "answer_relevance": 0.6224,
+  "context_precision": 0.875,
+  "context_recall": 0.7917
 }
 ```
 
-Dernier résultat observé sur 5 questions annotées :
+Dernier résultat observé sur 8 questions annotées :
 
 ```text
-Faithfulness: 0.9464
-Answer relevance: 0.8618
-Context precision: 1.0
-Ragas semantic_similarity: 0.9522
-Sources moyennes: 3.0
-Distance FAISS moyenne: 0.3858
+Faithfulness: 0.9006
+Answer relevance: 0.6224
+Context precision: 0.8750
+Context recall: 0.7917
+Sources moyennes: 2.6250
+Distance FAISS moyenne: 0.3741
 ```
 
 ## Configuration
@@ -621,26 +665,28 @@ doivent être ajoutées au `.env` que si l'on veut les surcharger localement.
 
 | Variable | Défaut | Usage |
 |---|---|---|
-| `MISTRAL_API_KEY` | vide | Secret obligatoire pour les embeddings et la génération Mistral |
+| `MISTRAL_API_KEY` | vide | Secret utilisé seulement si l'on force Mistral ou si le fallback Mistral est nécessaire |
 | `API_REBUILD_TOKEN` | vide | Token optionnel pour protéger `/rebuild` |
 | `MISTRAL_EMBEDDING_MODEL` | `mistral-embed` | Modèle d'embeddings |
 | `MISTRAL_CHAT_MODEL` | `mistral-small-latest` | Modèle de génération |
-| `LLM_PROVIDER` | `mistral` | Génération : `mistral`, `ollama` ou `auto` |
-| `EMBEDDING_PROVIDER` | `mistral` | Embeddings : `mistral` ou `ollama` |
+| `LLM_PROVIDER` | `auto` | Génération : `ollama` d'abord, puis Mistral en secours si disponible |
+| `EMBEDDING_PROVIDER` | `ollama` | Embeddings : `ollama` par défaut ou `mistral` après reconstruction |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Serveur Ollama local |
 | `OLLAMA_CHAT_MODEL` | `qwen2.5:7b` | Modèle local de génération |
 | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Modèle local d'embeddings |
 | `OLLAMA_MIN_TOKENS` | `600` | Minimum de génération Ollama |
 | `OLLAMA_NUM_CTX` | `8192` | Taille de contexte Ollama pour limiter la pression VRAM/RAM |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | `0.2` / `600` | Paramètres de génération par défaut |
-| `EMBEDDING_BATCH_SIZE` | `64` | Taille des lots envoyés à Mistral |
+| `EMBEDDING_BATCH_SIZE` | `64` | Taille des lots envoyés au fournisseur d'embeddings |
 | `OPENDATASOFT_RECORDS_URL` | endpoint public OpenDataSoft | Source de données |
 | `EVENTS_LOCATION` | `Paris` | Ville cible par défaut |
 | `EVENTS_LOOKBACK_DAYS` | `365` | Historique récupéré, en jours |
 | `EVENTS_LOOKAHEAD_DAYS` | `90` | Événements futurs récupérés, en jours |
 | `EVENTS_PAGE_SIZE` | `100` | Taille de page OpenDataSoft |
 | `DATA_DIR` | `data/` | Racine des données locales |
-| `VECTOR_STORE_DIR` | `data/vector_store` | Index vectoriel |
+| `VECTOR_STORE_DIR` | `data/vector_store` | Racine des deux index `future/` et `past/` |
+| `PROMPT_LOGS_DIR` | `data/prompt_logs` | Prompts complets sauvegardés à chaque appel LLM |
+| `INTERACTION_DB_PATH` | `data/interactions/interactions.db` | Journal SQLite local des questions, réponses, sources et feedbacks |
 | `TOP_K` | `3` | Nombre maximum de chunks retournés par défaut |
 | `RETRIEVAL_MAX_SCORE` | `0.45` | Distance FAISS maximale conservée par défaut |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `800` / `100` | Découpage documentaire |

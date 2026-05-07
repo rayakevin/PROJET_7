@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.rag.embeddings import EmbeddingModel, build_embedding_model
+from app.rag.temporal import TemporalBucket, classify_question_bucket
 from app.rag.vector_store import FaissVectorStore, SearchResult
 
 
@@ -14,13 +15,15 @@ class EventRetriever:
 
     def __init__(
         self,
-        vector_store: FaissVectorStore,
+        future_store: FaissVectorStore,
+        past_store: FaissVectorStore,
         top_k: int = settings.top_k,
         max_score: float | None = settings.retrieval_max_score,
     ) -> None:
-        """Conserve l'index FAISS et les paramètres de recherche par défaut."""
+        """Conserve les deux index FAISS et les paramètres de recherche."""
 
-        self.vector_store = vector_store
+        self.future_store = future_store
+        self.past_store = past_store
         self.top_k = top_k
         self.max_score = max_score
 
@@ -32,11 +35,33 @@ class EventRetriever:
         top_k: int = settings.top_k,
         max_score: float | None = settings.retrieval_max_score,
     ) -> "EventRetriever":
-        """Recharge le retriever depuis l'index local."""
+        """Recharge les index localement.
+
+        Les nouveaux artefacts sont stockés dans deux sous-dossiers :
+        `future/` pour les événements à venir et `past/` pour les événements
+        terminés. Si ces sous-dossiers n'existent pas encore, on garde une
+        compatibilité avec l'ancien index unique.
+        """
 
         model = embedding_model or build_embedding_model()
-        vector_store = FaissVectorStore.load(vector_store_dir, model)
-        return cls(vector_store=vector_store, top_k=top_k, max_score=max_score)
+        base_dir = Path(vector_store_dir)
+        future_dir = base_dir / "future"
+        past_dir = base_dir / "past"
+
+        if future_dir.exists() and past_dir.exists():
+            future_store = FaissVectorStore.load(model, future_dir)
+            past_store = FaissVectorStore.load(model, past_dir)
+        else:
+            single_store = FaissVectorStore.load(model, base_dir)
+            future_store = single_store
+            past_store = single_store
+
+        return cls(
+            future_store=future_store,
+            past_store=past_store,
+            top_k=top_k,
+            max_score=max_score,
+        )
 
     def retrieve(self, question: str) -> list[SearchResult]:
         """Retourne les meilleurs chunks pour une question."""
@@ -59,8 +84,17 @@ class EventRetriever:
     ) -> list[SearchResult]:
         """Recherche avec des paramètres optionnels de retrieval."""
 
-        return self.vector_store.search(
+        bucket = classify_question_bucket(question)
+        vector_store = self._select_store(bucket)
+        return vector_store.search(
             question,
             top_k=top_k or self.top_k,
             max_score=self.max_score if max_score is None else max_score,
         )
+
+    def _select_store(self, bucket: TemporalBucket) -> FaissVectorStore:
+        """Sélectionne l'index FAISS adapté à l'intention temporelle."""
+
+        if bucket == "past":
+            return self.past_store
+        return self.future_store

@@ -1,22 +1,34 @@
 [
   {
-    "question": "Je cherche un concert de Gospel Jazz pour la Fête de la musique à Paris, que peux-tu me proposer ?",
-    "reference_answer": "Le Concert de Gospel Jazz est proposé pour la Fête de la musique à Paris, au 132 avenue de Versailles, le 21 juin 2025. L'événement met en avant du gospel et du jazz, avec un concert suivi d'un cocktail dînatoire."
+    "question": "Je cherche une masterclass ou un concert de jazz avec Mark PRIORE à Paris, que peux-tu me recommander ?",
+    "reference_answer": "Je recommande Masterclass et concert de Mark PRIORE, organisé à l'Auditorium de l'Alliance française de Paris. L'événement est prévu le 18 mai 2026, avec une masterclass à 16h00 et un concert ensuite. C'est une proposition pertinente pour une demande autour du jazz à Paris."
   },
   {
-    "question": "Je veux faire une activité cosplay à la Cité des sciences et de l'Industrie, quels événements existent ?",
-    "reference_answer": "À la Cité des sciences et de l'Industrie, plusieurs événements cosplay existent : Cosplaymania - Confection de masques le 27 avril 2025, Cosplaymania - Concours et défilé cosplay le 27 avril 2025, Arduino et cosplay le 25 novembre 2025, ainsi que Cosplaymania et Cosplaymania 3 le 8 mai 2026."
+    "question": "Je cherche une nocturne gratuite à la Cité des sciences pour la Nuit européenne des musées 2026, que proposes-tu ?",
+    "reference_answer": "Je propose Nuit européenne des musées - 2026, à la Cité des sciences et de l'Industrie, à Paris. L'événement est prévu le 23 mai 2026, de 18h00 à minuit. Il s'agit d'une nocturne gratuite dans un musée scientifique, avec des expositions, des médiations scientifiques, la Cité des enfants et le planétarium."
   },
   {
-    "question": "Je cherche un spectacle jeune public dès 3 ans à Paris, as-tu une recommandation ?",
-    "reference_answer": "Le spectacle Englouti ! spectacle jeune public dès 3 ans est une recommandation pertinente. Il se joue au Théâtre Mandapa le 14 mai 2025 et propose un conte poétique avec marionnette et danse autour du thème de l'environnement."
+    "question": "Quel événement cosplay avec Sikay, Corneline et Edes a eu lieu à la Cité des sciences ?",
+    "reference_answer": "L'événement Parlons cosplay avec Sikay, Corneline et Edes a eu lieu à la Cité des sciences et de l'Industrie, à Paris. Il s'est déroulé le 3 mai 2026, de 12h30 à 13h30. C'était un moment d'échange autour du cosplay avec les invités après le concours."
   },
   {
-    "question": "Je voudrais voir une exposition autour de l'art japonais à Paris, que proposes-tu ?",
-    "reference_answer": "L'exposition L'écologie des choses - Regards sur les artistes japonais et leurs environnements de 1970 à nos jours est proposée à la Maison de la culture du Japon à Paris le 17 mai 2025."
+    "question": "Je cherche un événement autour de la Fête de la musique avec Le SPB descend dans la rue, où et quand a-t-il lieu ?",
+    "reference_answer": "L'événement Le SPB descend dans la rue a lieu au 1 rue Dieu, à Paris. Il est prévu le 21 juin 2026, de 17h00 à 21h59. C'est un événement musical associé à la Fête de la musique, avec une ambiance de fanfare et des styles comme le brass band, la pop, les musiques latino et le jazz."
   },
   {
-    "question": "Y a-t-il une avant-première du film RED BIRD à Paris ?",
-    "reference_answer": "Oui, l'avant-première du film RED BIRD est prévue au Grand Rex à Paris le 6 janvier 2026 à 20h30, en présence de l'équipe du film."
+    "question": "Je cherche une recommandation de concert de jazz à venir à Paris, que proposes-tu en priorité ?",
+    "reference_answer": "La recommandation prioritaire est Analogik Stomp Machine / Ft. Margherita Gruden & Lilou Claverie, prévu au JASS CLUB à Paris le 30 mai 2026. Cet événement correspond bien à une demande de concert de jazz à venir."
+  },
+  {
+    "question": "Quel défilé cosplay a eu lieu le 3 mai à la Cité des sciences ?",
+    "reference_answer": "Le Défilé de clôture de l'événement a eu lieu à la Cité des sciences et de l'Industrie, à Paris, le 3 mai 2026. Il s'est déroulé de 14h00 à 15h00 et clôturait un temps fort autour du cosplay."
+  },
+  {
+    "question": "Je cherche un événement à Paris pour améliorer mon pitch ou ma prise de parole professionnelle.",
+    "reference_answer": "L'événement Mieux se⋅vendre à l'ère digitale : persuasion et confiance à l'orale est une proposition adaptée. Il se déroule au Cargo Paris et vise à travailler la persuasion, la confiance et la prise de parole. Le contexte mentionne aussi Comment parler de son handicap, qui peut aider à préparer une prise de parole professionnelle sur un sujet personnel ou sensible."
+  },
+  {
+    "question": "Quelle avant-première du film RED BIRD a eu lieu à Paris ?",
+    "reference_answer": "L'avant-première du film RED BIRD a eu lieu au Grand Rex, à Paris. L'événement s'intitule Avant-Première du film \"RED BIRD\" au GRAND REX. Il s'agit d'une projection en avant-première organisée dans ce cinéma parisien."
   }
 ]

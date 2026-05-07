@@ -1,26 +1,30 @@
-"""Tests d'integration du vector store avec vrais embeddings Mistral."""
+"""Tests d'intégration du vector store avec vrais embeddings locaux."""
 
 from pathlib import Path
 
 import pytest
+import requests
 
 from app.config import settings
-from app.rag.embeddings import MistralEmbeddingModel
+from app.rag.embeddings import build_embedding_model
 from app.rag.vector_store import FaissVectorStore
 
 
-def test_real_vector_store_search_with_mistral_embeddings() -> None:
+def test_real_vector_store_search_with_local_embeddings() -> None:
     """Vérifie une recherche sur l'index FAISS réel."""
 
-    index_path = Path(settings.vector_store_dir) / "index.faiss"
-    chunks_path = Path(settings.vector_store_dir) / "chunks.json"
+    future_dir = Path(settings.vector_store_dir) / "future"
+    index_path = future_dir / "index.faiss"
+    chunks_path = future_dir / "chunks.json"
 
-    if not settings.mistral_api_key:
-        pytest.skip("MISTRAL_API_KEY non renseignée.")
     if not index_path.exists() or not chunks_path.exists():
         pytest.skip("Index FAISS réel absent. Lancer scripts/rebuild_index.py --index.")
+    try:
+        requests.get(f"{settings.ollama_base_url}/api/tags", timeout=2).raise_for_status()
+    except requests.RequestException:
+        pytest.skip("Ollama non disponible localement.")
 
-    vector_store = FaissVectorStore.load(settings.vector_store_dir, MistralEmbeddingModel())
+    vector_store = FaissVectorStore.load(build_embedding_model(), future_dir)
     results = vector_store.search(
         "Quels concerts de jazz sont disponibles à Paris ?",
         top_k=3,

@@ -43,6 +43,9 @@ data/raw/*
 data/processed/*
 data/vector_store/*
 data/evaluation/results/*
+data/prompt_logs/*
+data/interactions.db
+data/interactions/*
 
 # Logs
 *.log
@@ -50,3 +53,6 @@ logs/
 
 # Documentation personnelle de préparation soutenance
 docs_perso/
+
+# Repo cours OCR LLM
+8532116-mettez-en-place-un-rag-pour-un-llm-main/
