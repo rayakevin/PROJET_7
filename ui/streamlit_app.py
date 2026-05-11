@@ -11,11 +11,11 @@ import streamlit as st
 
 DEFAULT_API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 DEMO_QUESTIONS = [
-    "Je cherche un concert de Gospel Jazz pour la Fête de la musique à Paris, que peux-tu me proposer ?",
-    "Je veux faire une activité cosplay à la Cité des sciences et de l'Industrie, quels événements existent ?",
-    "Je cherche un spectacle jeune public dès 3 ans à Paris, as-tu une recommandation ?",
-    "Je voudrais voir une exposition autour de l'art japonais à Paris, que proposes-tu ?",
-    "Y a-t-il une avant-première du film RED BIRD à Paris ?",
+    "Je cherche une masterclass ou un concert de jazz avec Mark PRIORE à Paris, que peux-tu me recommander ?",
+    "Je cherche une nocturne gratuite à la Cité des sciences pour la Nuit européenne des musées 2026, que proposes-tu ?",
+    "Quel événement cosplay avec Sikay, Corneline et Edes a eu lieu à la Cité des sciences ?",
+    "Je cherche un événement autour de la Fête de la musique avec Le SPB descend dans la rue, où et quand a-t-il lieu ?",
+    "Quelle avant-première du film RED BIRD a eu lieu à Paris ?",
 ]
 
 
@@ -28,6 +28,8 @@ def main() -> None:
         layout="wide",
     )
     st.title("Assistant culturel Puls-Events")
+    if "last_response" not in st.session_state:
+        st.session_state.last_response = None
 
     with st.sidebar:
         st.header("API")
@@ -56,20 +58,20 @@ def main() -> None:
             options=[
                 "Mistral API",
                 "Ollama local",
-                "Auto : Mistral puis Ollama",
+                "Auto : Ollama puis Mistral",
             ],
-            index=0,
+            index=2,
             help=(
                 "Le mode Ollama utilise les ressources locales de la machine. "
-                "Le mode auto tente Mistral, puis bascule sur Ollama si l'appel échoue."
+                "Le mode auto tente Ollama, puis bascule sur Mistral si l'appel échoue."
             ),
         )
         llm_provider = {
             "Mistral API": "mistral",
             "Ollama local": "ollama",
-            "Auto : Mistral puis Ollama": "auto",
+            "Auto : Ollama puis Mistral": "auto",
         }[llm_provider_label]
-        default_llm_model = "qwen2.5:7b" if llm_provider == "ollama" else ""
+        default_llm_model = "qwen2.5:7b" if llm_provider in {"ollama", "auto"} else ""
         llm_model = st.text_input(
             "Modèle LLM optionnel",
             value=default_llm_model,
@@ -108,6 +110,10 @@ def main() -> None:
         }
         ask_api(api_base_url, payload)
 
+    if st.session_state.last_response:
+        display_response(st.session_state.last_response)
+        show_feedback_form(api_base_url, st.session_state.last_response)
+
 
 def show_health(api_base_url: str) -> None:
     """Affiche le statut de l'API."""
@@ -124,7 +130,7 @@ def show_health(api_base_url: str) -> None:
 
 
 def ask_api(api_base_url: str, payload: dict[str, Any]) -> None:
-    """Appelle /ask et affiche la réponse."""
+    """Appelle /ask et mémorise la réponse."""
 
     if not payload["question"].strip():
         st.warning("La question ne peut pas être vide.")
@@ -144,7 +150,12 @@ def ask_api(api_base_url: str, payload: dict[str, Any]) -> None:
             st.code(exc.response.text)
         return
 
-    data = response.json()
+    st.session_state.last_response = response.json()
+
+
+def display_response(data: dict[str, Any]) -> None:
+    """Affiche la dernière réponse RAG et ses sources."""
+
     st.subheader("Réponse")
     st.markdown(data["answer"])
 
@@ -162,6 +173,56 @@ def ask_api(api_base_url: str, payload: dict[str, Any]) -> None:
 
     st.subheader("Paramètres appliqués")
     st.json(data.get("parameters", {}))
+
+
+def show_feedback_form(api_base_url: str, data: dict[str, Any]) -> None:
+    """Affiche un feedback simple inspiré du cours RAG."""
+
+    interaction_id = data.get("interaction_id")
+    if not interaction_id:
+        return
+
+    st.subheader("Feedback")
+    st.caption(
+        "Ce retour est stocké localement pour analyser les réponses après la démo."
+    )
+    comment = st.text_input(
+        "Commentaire optionnel",
+        key=f"feedback_comment_{interaction_id}",
+        placeholder="Exemple : bonne réponse, source manquante, date imprécise...",
+    )
+    col_positive, col_negative = st.columns(2)
+    with col_positive:
+        if st.button("Réponse utile", use_container_width=True):
+            submit_feedback(api_base_url, interaction_id, "positive", comment)
+    with col_negative:
+        if st.button("Réponse à revoir", use_container_width=True):
+            submit_feedback(api_base_url, interaction_id, "negative", comment)
+
+
+def submit_feedback(
+    api_base_url: str,
+    interaction_id: int,
+    score: str,
+    comment: str | None,
+) -> None:
+    """Envoie le feedback à l'API."""
+
+    try:
+        response = requests.post(
+            f"{api_base_url.rstrip('/')}/feedback",
+            json={
+                "interaction_id": interaction_id,
+                "score": score,
+                "comment": comment or None,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        st.error(f"Feedback non enregistré : {exc}")
+        return
+    st.success("Feedback enregistré.")
 
 
 if __name__ == "__main__":

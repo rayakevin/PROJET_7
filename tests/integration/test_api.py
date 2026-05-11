@@ -85,9 +85,10 @@ def test_metadata_endpoint_returns_public_configuration() -> None:
     assert "api_rebuild_token" not in payload
 
 
-def test_ask_endpoint_returns_rag_answer() -> None:
+def test_ask_endpoint_returns_rag_answer(monkeypatch, tmp_path) -> None:
     """Vérifie le endpoint /ask avec un service QA remplacé."""
 
+    monkeypatch.setattr(routes.settings, "interaction_db_path", tmp_path / "interactions.db")
     app.dependency_overrides[routes.get_qa_service] = lambda: FakeQAService()
     client = TestClient(app)
 
@@ -97,8 +98,55 @@ def test_ask_endpoint_returns_rag_answer() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["answer"] == "Voici une réponse de test."
+    assert payload["interaction_id"] == 1
     assert payload["sources"][0]["title"] == "Concert jazz"
     assert payload["parameters"]["top_k"] is None
+
+
+def test_feedback_endpoint_updates_interaction(monkeypatch, tmp_path) -> None:
+    """Vérifie l'enregistrement d'un feedback utilisateur."""
+
+    monkeypatch.setattr(routes.settings, "interaction_db_path", tmp_path / "interactions.db")
+    app.dependency_overrides[routes.get_qa_service] = lambda: FakeQAService()
+    client = TestClient(app)
+
+    ask_response = client.post("/ask", json={"question": "Quels concerts jazz ?"})
+    interaction_id = ask_response.json()["interaction_id"]
+    feedback_response = client.post(
+        "/feedback",
+        json={
+            "interaction_id": interaction_id,
+            "score": "positive",
+            "comment": "Réponse utile.",
+        },
+    )
+
+    app.dependency_overrides.clear()
+    assert feedback_response.status_code == 200
+    assert feedback_response.json() == {
+        "status": "ok",
+        "interaction_id": interaction_id,
+    }
+
+
+def test_feedback_endpoint_returns_404_for_unknown_interaction(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """Vérifie le 404 quand le feedback vise une interaction absente."""
+
+    monkeypatch.setattr(routes.settings, "interaction_db_path", tmp_path / "interactions.db")
+    client = TestClient(app)
+
+    response = client.post(
+        "/feedback",
+        json={
+            "interaction_id": 999,
+            "score": "negative",
+        },
+    )
+
+    assert response.status_code == 404
 
 
 def test_ask_endpoint_accepts_runtime_parameters() -> None:
@@ -129,6 +177,26 @@ def test_ask_endpoint_accepts_runtime_parameters() -> None:
         temperature=0.4,
         max_tokens=500,
     )
+
+
+def test_ask_endpoint_ignores_swagger_string_model_placeholder() -> None:
+    """Vérifie que le placeholder Swagger ne remplace pas le modèle configuré."""
+
+    fake_service = FakeQAService()
+    app.dependency_overrides[routes.get_qa_service] = lambda: fake_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Quels concerts jazz ?",
+            "llm_model": "string",
+        },
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert fake_service.last_parameters == QAParameters(llm_model=None)
 
 
 def test_ask_endpoint_rejects_empty_question() -> None:

@@ -19,13 +19,15 @@ if str(PROJECT_ROOT) not in sys.path:
 from ragas import EvaluationDataset, SingleTurnSample, evaluate  # noqa: E402
 from ragas.llms import LangchainLLMWrapper  # noqa: E402
 from ragas.metrics._answer_relevance import ResponseRelevancy  # noqa: E402
-from ragas.metrics._answer_similarity import SemanticSimilarity  # noqa: E402
 from ragas.metrics._context_precision import LLMContextPrecisionWithReference  # noqa: E402
+from ragas.metrics._context_recall import LLMContextRecall  # noqa: E402
 from ragas.metrics._faithfulness import Faithfulness  # noqa: E402
+from ragas.run_config import RunConfig  # noqa: E402
 
 from app.config import settings  # noqa: E402
-from app.rag.embeddings import MistralEmbeddingModel  # noqa: E402
-from app.rag.llm import MistralChatModel  # noqa: E402
+from app.rag.answer import build_answer_generator  # noqa: E402
+from app.rag.embeddings import build_embedding_model  # noqa: E402
+from app.rag.llm import MistralChatModel, OllamaChatModel  # noqa: E402
 from app.rag.vector_store import LangChainEmbeddingAdapter, SearchResult  # noqa: E402
 from app.services.qa_service import QAService, build_sources  # noqa: E402
 from app.utils.io import read_json, write_json  # noqa: E402
@@ -102,7 +104,8 @@ def run_predictions(
 
     for example in examples:
         contexts = service.retriever.retrieve(example.question)
-        answer = service.answer_generator.generate(example.question, contexts)
+        answer_generator = service.answer_generator or build_answer_generator()
+        answer = answer_generator.generate(example.question, contexts)
         predictions.append(
             EvaluationPrediction(
                 question=example.question,
@@ -149,9 +152,6 @@ def run_ragas_metrics(
 ) -> dict[str, Any]:
     """Calcule les métriques Ragas disponibles pour le POC."""
 
-    if not settings.mistral_api_key:
-        raise ValueError("MISTRAL_API_KEY doit être renseignée pour lancer Ragas.")
-
     dataset = EvaluationDataset(
         samples=[
             SingleTurnSample(
@@ -163,7 +163,9 @@ def run_ragas_metrics(
             for prediction in predictions
         ]
     )
-    embeddings = LangChainEmbeddingAdapter(MistralEmbeddingModel())
+    embeddings = LangChainEmbeddingAdapter(
+        build_embedding_model(settings.ragas_embedding_provider)
+    )
     with warnings.catch_warnings():
         # Ragas accepte encore ce wrapper LangChain malgré l'avertissement de
         # dépréciation. On masque seulement cet avertissement connu pour garder
@@ -174,12 +176,7 @@ def run_ragas_metrics(
             category=DeprecationWarning,
         )
         llm = LangchainLLMWrapper(
-            MistralChatModel(
-                api_key=settings.mistral_api_key,
-                model=settings.mistral_chat_model,
-                temperature=0.0,
-                max_tokens=max(settings.llm_max_tokens, 2000),
-            )
+            build_ragas_judge_model()
         )
     result = evaluate(
         dataset,
@@ -187,11 +184,16 @@ def run_ragas_metrics(
             Faithfulness(),
             ResponseRelevancy(),
             LLMContextPrecisionWithReference(),
-            SemanticSimilarity(),
+            LLMContextRecall(),
         ],
         llm=llm,
         embeddings=embeddings,
+        run_config=RunConfig(
+            timeout=settings.ragas_timeout_seconds,
+            max_workers=settings.ragas_max_workers,
+        ),
         show_progress=False,
+        batch_size=1,
         raise_exceptions=False,
     )
     rows = result.to_pandas().to_dict(orient="records")
@@ -202,6 +204,37 @@ def run_ragas_metrics(
         "required_metrics": build_required_metrics_summary(summary),
         "rows": rows,
     }
+
+
+def build_ragas_judge_model() -> MistralChatModel | OllamaChatModel:
+    """Construit le modèle juge utilisé par Ragas."""
+
+    provider = settings.ragas_llm_provider.lower()
+    if provider == "ollama":
+        return OllamaChatModel(
+            base_url=settings.ollama_base_url,
+            model=settings.ragas_llm_model,
+            temperature=settings.ragas_temperature,
+            max_tokens=settings.ragas_max_tokens,
+            timeout_seconds=max(
+                settings.ollama_timeout_seconds,
+                settings.ragas_timeout_seconds,
+            ),
+            num_ctx=settings.ollama_num_ctx,
+        )
+    if provider == "mistral":
+        if not settings.mistral_api_key:
+            raise ValueError("MISTRAL_API_KEY doit être renseignée pour Ragas/Mistral.")
+        return MistralChatModel(
+            api_key=settings.mistral_api_key,
+            model=settings.mistral_chat_model,
+            temperature=settings.ragas_temperature,
+            max_tokens=settings.ragas_max_tokens,
+        )
+    raise ValueError(
+        "RAGAS_LLM_PROVIDER doit valoir 'ollama' ou 'mistral'. "
+        f"Valeur reçue : {provider}."
+    )
 
 
 def summarize_metric_rows(
@@ -238,6 +271,7 @@ def build_required_metrics_summary(summary: dict[str, float]) -> dict[str, float
         "faithfulness": summary.get("faithfulness"),
         "answer_relevance": summary.get("answer_relevancy"),
         "context_precision": summary.get("llm_context_precision_with_reference"),
+        "context_recall": summary.get("context_recall"),
     }
 
 

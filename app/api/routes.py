@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -10,6 +11,8 @@ from app.api.schemas import (
     AskRequest,
     AskResponse,
     ErrorResponse,
+    FeedbackRequest,
+    FeedbackResponse,
     HealthResponse,
     MetadataResponse,
     RebuildRequest,
@@ -18,12 +21,14 @@ from app.api.schemas import (
 from app.config import settings
 from app.ingestion.build_dataset import build_dataset
 from app.ingestion.fetch_events import fetch_events
+from app.services.interaction_log import log_interaction, save_feedback
 from app.services.qa_service import QAParameters, QAService
 from app.services.rebuild_service import rebuild_vector_index
 
 
 router = APIRouter()
 _qa_service_cache: QAService | None = None
+logger = logging.getLogger(__name__)
 
 
 def get_qa_service() -> QAService:
@@ -60,9 +65,11 @@ def vector_store_ready() -> bool:
     """Indique si les artefacts d'index sont présents localement."""
 
     vector_store_dir = Path(settings.vector_store_dir)
+    required_files = ["index.faiss", "index.pkl", "chunks.json"]
     return all(
-        (vector_store_dir / filename).exists()
-        for filename in ["index.faiss", "index.pkl", "chunks.json"]
+        (vector_store_dir / bucket / filename).exists()
+        for bucket in ["future", "past"]
+        for filename in required_files
     )
 
 
@@ -157,7 +164,40 @@ def ask(
             detail=str(exc),
         ) from exc
 
-    return AskResponse(**response.to_dict())
+    response_payload = response.to_dict()
+    try:
+        interaction_id = log_interaction(
+            question=response_payload["question"],
+            answer=response_payload["answer"],
+            sources=response_payload["sources"],
+            parameters=response_payload["parameters"],
+        )
+    except Exception as exc:
+        logger.warning("Interaction non journalisée : %s", exc)
+        interaction_id = None
+    return AskResponse(interaction_id=interaction_id, **response_payload)
+
+
+@router.post(
+    "/feedback",
+    response_model=FeedbackResponse,
+    responses={404: {"model": ErrorResponse}},
+    summary="Enregistrer un feedback utilisateur",
+)
+def feedback(request: FeedbackRequest) -> FeedbackResponse:
+    """Enregistre un retour simple sur une réponse déjà produite."""
+
+    saved = save_feedback(
+        interaction_id=request.interaction_id,
+        score=request.score,
+        comment=request.comment,
+    )
+    if not saved:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Interaction introuvable.",
+        )
+    return FeedbackResponse(status="ok", interaction_id=request.interaction_id)
 
 
 @router.post(

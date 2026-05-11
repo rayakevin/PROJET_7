@@ -97,12 +97,21 @@ class Settings:
     evaluation_data_dir: Path = Path(
         os.getenv("EVALUATION_DATA_DIR", BASE_DIR / "data" / "evaluation")
     )
+    prompt_logs_dir: Path = Path(
+        os.getenv("PROMPT_LOGS_DIR", BASE_DIR / "data" / "prompt_logs")
+    )
+    interaction_db_path: Path = Path(
+        os.getenv(
+            "INTERACTION_DB_PATH",
+            BASE_DIR / "data" / "interactions" / "interactions.db",
+        )
+    )
 
     mistral_api_key: str = os.getenv("MISTRAL_API_KEY", "")
     mistral_embedding_model: str = os.getenv("MISTRAL_EMBEDDING_MODEL", "mistral-embed")
     mistral_chat_model: str = os.getenv("MISTRAL_CHAT_MODEL", "mistral-small-latest")
-    llm_provider: str = os.getenv("LLM_PROVIDER", "mistral")
-    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "mistral")
+    llm_provider: str = os.getenv("LLM_PROVIDER", "auto")
+    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "ollama")
     llm_temperature: float = _float_env("LLM_TEMPERATURE", 0.2)
     llm_max_tokens: int = _int_env("LLM_MAX_TOKENS", 600)
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
@@ -114,6 +123,16 @@ class Settings:
     ollama_timeout_seconds: int = _int_env("OLLAMA_TIMEOUT_SECONDS", 180)
     ollama_min_tokens: int = _int_env("OLLAMA_MIN_TOKENS", 600)
     ollama_num_ctx: int = _int_env("OLLAMA_NUM_CTX", 8192)
+    ragas_llm_provider: str = os.getenv("RAGAS_LLM_PROVIDER", "ollama")
+    ragas_llm_model: str = os.getenv("RAGAS_LLM_MODEL", "qwen3:30b")
+    ragas_embedding_provider: str = os.getenv(
+        "RAGAS_EMBEDDING_PROVIDER",
+        os.getenv("EMBEDDING_PROVIDER", "ollama"),
+    )
+    ragas_max_tokens: int = _int_env("RAGAS_MAX_TOKENS", 2000)
+    ragas_temperature: float = _float_env("RAGAS_TEMPERATURE", 0.0)
+    ragas_timeout_seconds: int = _int_env("RAGAS_TIMEOUT_SECONDS", 600)
+    ragas_max_workers: int = _int_env("RAGAS_MAX_WORKERS", 1)
     embedding_batch_size: int = _int_env("EMBEDDING_BATCH_SIZE", 64)
     embedding_batch_delay_seconds: float = _float_env(
         "EMBEDDING_BATCH_DELAY_SECONDS", 1.0

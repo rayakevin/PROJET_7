@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HealthResponse(BaseModel):
@@ -44,6 +44,21 @@ class MetadataResponse(BaseModel):
 class AskRequest(BaseModel):
     """Requête utilisateur pour le chatbot."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "question": "Quels concerts jazz à Paris ?",
+                    "top_k": 3,
+                    "retrieval_max_score": 0.45,
+                    "temperature": 0.2,
+                    "max_tokens": 600,
+                    "llm_provider": "mistral",
+                }
+            ]
+        }
+    )
+
     question: str = Field(..., min_length=1, examples=["Quels concerts jazz à Paris ?"])
     top_k: int | None = Field(
         default=None,
@@ -72,7 +87,7 @@ class AskRequest(BaseModel):
     llm_provider: Literal["mistral", "ollama", "auto"] | None = Field(
         default=None,
         description=(
-            "Fournisseur de génération. 'auto' essaie Mistral puis Ollama."
+            "Fournisseur de génération. 'auto' essaie Ollama puis Mistral."
         ),
     )
     llm_model: str | None = Field(
@@ -88,6 +103,20 @@ class AskRequest(BaseModel):
         cleaned_value = value.strip()
         if not cleaned_value:
             raise ValueError("La question ne peut pas être vide.")
+        return cleaned_value
+
+    @field_validator("llm_model")
+    @classmethod
+    def validate_llm_model(cls, value: str | None) -> str | None:
+        """Nettoie le modèle LLM optionnel envoyé par Swagger ou l'UI."""
+
+        if value is None:
+            return None
+
+        cleaned_value = value.strip()
+        if not cleaned_value or cleaned_value.lower() == "string":
+            return None
+
         return cleaned_value
 
 
@@ -110,10 +139,39 @@ class AnswerSourceResponse(BaseModel):
 class AskResponse(BaseModel):
     """Réponse augmentée du chatbot."""
 
+    interaction_id: int | None = Field(
+        default=None,
+        description="Identifiant local de l'interaction, utile pour envoyer un feedback.",
+    )
     question: str
     answer: str
     sources: list[AnswerSourceResponse]
     parameters: dict[str, int | float | str | None]
+
+
+class FeedbackRequest(BaseModel):
+    """Feedback utilisateur sur une interaction enregistrée."""
+
+    interaction_id: int = Field(..., ge=1)
+    score: Literal["positive", "negative"]
+    comment: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("comment")
+    @classmethod
+    def validate_comment(cls, value: str | None) -> str | None:
+        """Nettoie le commentaire optionnel."""
+
+        if value is None:
+            return None
+        cleaned_value = value.strip()
+        return cleaned_value or None
+
+
+class FeedbackResponse(BaseModel):
+    """Réponse après enregistrement d'un feedback."""
+
+    status: str
+    interaction_id: int
 
 
 class RebuildRequest(BaseModel):
@@ -145,6 +203,8 @@ class RebuildResponse(BaseModel):
     vector_store_dir: str
     events_count: int
     chunks_count: int
+    future_events_count: int = 0
+    past_events_count: int = 0
 
 
 class ErrorResponse(BaseModel):

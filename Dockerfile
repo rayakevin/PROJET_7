@@ -25,12 +25,12 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY app ./app
 COPY scripts ./scripts
 COPY ui ./ui
+COPY data/vector_store ./data/vector_store
 COPY main.py README.md pyproject.toml ./
 
 RUN mkdir -p \
     /app/data/raw \
     /app/data/processed \
-    /app/data/vector_store \
     /app/data/evaluation/results
 
 EXPOSE 8000

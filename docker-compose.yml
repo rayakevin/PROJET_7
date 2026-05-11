@@ -15,9 +15,12 @@ services:
       PROCESSED_DATA_DIR: /app/data/processed
       VECTOR_STORE_DIR: /app/data/vector_store
       EVALUATION_DATA_DIR: /app/data/evaluation
+      PROMPT_LOGS_DIR: /app/data/prompt_logs
+      INTERACTION_DB_PATH: /app/data/interactions/interactions.db
       OLLAMA_BASE_URL: http://host.docker.internal:11434
     volumes:
-      - ./data:/app/data
+      - ./data/prompt_logs:/app/data/prompt_logs
+      - ./data/interactions:/app/data/interactions
     ports:
       - "8000:8000"
 
