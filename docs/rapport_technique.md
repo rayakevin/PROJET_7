@@ -121,6 +121,95 @@ Les filtres appliqués sont :
 
 La récupération gère la pagination OpenDataSoft avec `limit` et `offset`.
 
+### Schéma de données : de l'ingestion au stockage
+
+Le schéma ci-dessous montre ce que deviennent les données depuis l'appel
+OpenDataSoft jusqu'au stockage local utilisé par le RAG.
+
+```mermaid
+flowchart TD
+    ods[API OpenDataSoft<br/>Dataset evenements-publics-openagenda]
+    client[app/clients/opendatasoft_client.py<br/>Construction de la requête<br/>where, limit, offset]
+    fetch[app/ingestion/fetch_events.py<br/>Appel HTTP et sauvegarde]
+    raw[(data/raw/events_raw.json<br/>Evénements bruts)]
+
+    normalize[app/ingestion/normalize_events.py<br/>Nettoyage et normalisation]
+    quality[app/ingestion/quality.py<br/>Contrôle qualité]
+    processed[(data/processed/events_processed.json<br/>Evénements normalisés)]
+    report[(data/processed/events_quality_report.json<br/>Rapport qualité)]
+
+    temporal[app/rag/temporal.py<br/>Séparation future / past]
+    chunking[app/rag/chunking.py<br/>Découpage du full_text]
+    chunks_future[(data/vector_store/future/chunks.json<br/>Chunks futurs + métadonnées)]
+    chunks_past[(data/vector_store/past/chunks.json<br/>Chunks passés + métadonnées)]
+
+    embeddings[app/rag/embeddings.py<br/>Vectorisation des chunks]
+    faiss[app/rag/vector_store.py<br/>Construction FAISS via LangChain]
+    index_future[(data/vector_store/future/index.faiss<br/>data/vector_store/future/index.pkl)]
+    index_past[(data/vector_store/past/index.faiss<br/>data/vector_store/past/index.pkl)]
+
+    ods --> client --> fetch --> raw
+    raw --> normalize --> processed
+    processed --> quality --> report
+    processed --> temporal
+    temporal -->|événements à venir| chunking
+    temporal -->|événements passés| chunking
+    chunking --> chunks_future
+    chunking --> chunks_past
+    chunks_future --> embeddings
+    chunks_past --> embeddings
+    embeddings --> faiss
+    faiss --> index_future
+    faiss --> index_past
+```
+
+Lecture du schéma :
+
+| Étape | Fichier ou objet produit | Contenu principal | Utilisation ensuite |
+|---|---|---|---|
+| Ingestion brute | `data/raw/events_raw.json` | Liste d'événements tels que retournés par OpenDataSoft, avec la structure source | Sert d'entrée reproductible au nettoyage |
+| Normalisation | `data/processed/events_processed.json` | Événements simplifiés avec `uid`, `title`, `description`, `location_name`, `city`, `start`, `end`, `keywords`, `full_text` | Sert d'entrée au chunking et à l'indexation |
+| Contrôle qualité | `data/processed/events_quality_report.json` | Complétude des champs, longueurs de `full_text`, doublons d'UID, événements indexables | Permet de vérifier que le dataset est exploitable |
+| Chunking futur | `data/vector_store/future/chunks.json` | Chunks textuels des événements à venir avec métadonnées métier | Permet de relire les textes associés à l'index futur |
+| Chunking passé | `data/vector_store/past/chunks.json` | Chunks textuels des événements passés avec métadonnées métier | Permet de relire les textes associés à l'index passé |
+| Index vectoriel futur | `data/vector_store/future/index.faiss` et `index.pkl` | Vecteurs FAISS et structure LangChain des événements futurs | Interrogé par défaut pour les questions de recommandation |
+| Index vectoriel passé | `data/vector_store/past/index.faiss` et `index.pkl` | Vecteurs FAISS et structure LangChain des événements passés | Interrogé si la question vise explicitement le passé |
+
+Structure simplifiée d'un événement normalisé :
+
+```json
+{
+  "uid": "39389254",
+  "title": "Concert de Gospel Jazz",
+  "description": "Fête de la musique 2025...",
+  "location_name": "132 avenue de Versailles",
+  "city": "Paris",
+  "start": "2025-06-21T16:30:00+00:00",
+  "end": "2025-06-21T18:30:00+00:00",
+  "keywords": ["jazz", "gospel", "concert"],
+  "full_text": "Titre : Concert de Gospel Jazz\nMots-clés : jazz, gospel, concert\n..."
+}
+```
+
+Structure simplifiée d'un chunk indexé :
+
+```json
+{
+  "id": "39389254::chunk-0",
+  "text": "Titre : Concert de Gospel Jazz Mots-clés : jazz, gospel...",
+  "metadata": {
+    "event_uid": "39389254",
+    "chunk_index": 0,
+    "title": "Concert de Gospel Jazz",
+    "city": "Paris",
+    "location_name": "132 avenue de Versailles",
+    "start": "2025-06-21T16:30:00+00:00",
+    "end": "2025-06-21T18:30:00+00:00",
+    "keywords": ["jazz", "gospel", "concert"]
+  }
+}
+```
+
 ### Nettoyage
 
 Les événements bruts sont normalisés dans `app/ingestion/normalize_events.py`.
