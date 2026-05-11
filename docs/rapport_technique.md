@@ -58,7 +58,7 @@ Le POC cherche à démontrer trois points :
 
 ```mermaid
 flowchart LR
-    subgraph offline[Pipeline offline : ingestion et indexation]
+    subgraph data[Pipeline data : ingestion et indexation]
         ods[OpenDataSoft / OpenAgenda] --> fetch[fetch_events.py]
         fetch --> raw[(events_raw.json)]
         raw --> normalize[normalisation + contrôle qualité]
@@ -68,7 +68,7 @@ flowchart LR
         doc_embeddings --> faiss[(Index FAISS<br/>future + past)]
     end
 
-    subgraph online[Pipeline online : question et réponse]
+    subgraph QA[Pipeline QA : question et réponse]
         user[Utilisateur ou équipe métier] --> ui[Interface Streamlit]
         user --> api[API FastAPI]
         ui --> api
