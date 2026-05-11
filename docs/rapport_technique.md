@@ -58,31 +58,36 @@ Le POC cherche à démontrer trois points :
 
 ```mermaid
 flowchart LR
-    user[Utilisateur ou équipe métier] --> ui[Interface Streamlit]
-    user --> api[API FastAPI]
-    ui --> api
+    subgraph offline[Pipeline offline : ingestion et indexation]
+        ods[OpenDataSoft / OpenAgenda] --> fetch[fetch_events.py]
+        fetch --> raw[(events_raw.json)]
+        raw --> normalize[normalisation + contrôle qualité]
+        normalize --> processed[(events_processed.json)]
+        processed --> chunking[découpage full_text]
+        chunking --> doc_embeddings[Embeddings des chunks<br/>Mistral ou Ollama]
+        doc_embeddings --> faiss[(Index FAISS<br/>future + past)]
+    end
 
-    api --> qa[QAService]
-    qa --> retriever[EventRetriever]
-    retriever --> faiss[(Index FAISS)]
-    faiss --> chunks[(chunks + métadonnées)]
-    retriever --> embeddings[Embeddings Mistral ou Ollama]
-    qa --> prompt[Prompt RAG LangChain]
-    chunks --> prompt
-    prompt --> llm[Mistral chat ou Ollama local]
-    llm --> api
+    subgraph online[Pipeline online : question et réponse]
+        user[Utilisateur ou équipe métier] --> ui[Interface Streamlit]
+        user --> api[API FastAPI]
+        ui --> api
+        api --> qa[QAService]
+        qa --> retriever[EventRetriever]
+        retriever --> query_embedding[Embedding de la question<br/>même modèle que l'index]
+        query_embedding --> faiss
+        faiss --> chunks[(chunks + métadonnées)]
+        chunks --> prompt[Prompt RAG LangChain]
+        qa --> prompt
+        prompt --> llm[Mistral chat ou Ollama local]
+        llm --> api
+    end
 
-    ods[OpenDataSoft / OpenAgenda] --> fetch[fetch_events.py]
-    fetch --> raw[(events_raw.json)]
-    raw --> normalize[normalisation + contrôle qualité]
-    normalize --> processed[(events_processed.json)]
-    processed --> chunking[découpage full_text]
-    chunking --> embeddings
-    embeddings --> faiss
-
-    qa_dataset[jeu de test annoté] --> eval[evaluate_rag.py]
-    api --> eval
-    eval --> ragas[Ragas]
+    subgraph evaluation[Évaluation]
+        qa_dataset[jeu de test annoté] --> eval[evaluate_rag.py]
+        api --> eval
+        eval --> ragas[Ragas]
+    end
 ```
 
 ### Technologies utilisées
