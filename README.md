@@ -269,10 +269,24 @@ endpoint public. Les autres paramètres ont des valeurs par défaut dans
 ```powershell
 uv run python scripts/check_environment.py
 uv run pytest
+uv run python scripts/run_pytest.py
 ```
 
 Avec l'installation classique sans `uv`, utiliser plutôt
 `.\.venv\Scripts\python.exe -m pytest`.
+
+Pour conserver une trace des tests unitaires et d'intégration dans des fichiers :
+
+```powershell
+uv run python scripts/run_pytest.py
+```
+
+Sorties par défaut :
+
+- `data/evaluation/results/pytest_report_<timestamp>.txt`
+- `data/evaluation/results/pytest_report_<timestamp>.json`
+- `data/evaluation/results/pytest_report_latest.txt`
+- `data/evaluation/results/pytest_report_latest.json`
 
 ### 5. Préparer les données et l'index FAISS
 
@@ -634,6 +648,10 @@ Sorties par défaut :
 
 - `data/evaluation/results/rag_evaluation_<timestamp>.json`
 - `data/evaluation/results/rag_evaluation_latest.json`
+- `data/evaluation/results/pytest_report_<timestamp>.txt`
+- `data/evaluation/results/pytest_report_<timestamp>.json`
+- `data/evaluation/results/pytest_report_latest.txt`
+- `data/evaluation/results/pytest_report_latest.json`
 
 Le rapport expose les noms internes Ragas et un résumé lisible dans
 `summary.required_ragas_metrics` :
